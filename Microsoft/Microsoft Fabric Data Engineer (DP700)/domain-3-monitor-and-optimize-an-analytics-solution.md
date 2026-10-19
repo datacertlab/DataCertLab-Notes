@@ -586,9 +586,3 @@ from 10 to 100, High above 100.
 > **Trap.** Interactive work is throttled before background work. The portable rule: the refresh
 > keeps running while the user-facing query is rejected, which is the opposite of what the complaint
 > will tell you.
-
----
-
-*Checked against Microsoft's documentation on 17 October 2026, for the skills-measured version
-dated 19 October 2026. Fabric ships monthly and published limits, defaults and runtime versions all
-move; where the live documentation and this page disagree, the documentation is newer.*

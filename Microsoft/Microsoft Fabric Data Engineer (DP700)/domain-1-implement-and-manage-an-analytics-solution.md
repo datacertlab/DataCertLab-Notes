@@ -652,5 +652,3 @@ whole run.
 > DefaultReader, and a OneLake security role changes nothing on a SQL analytics endpoint still in
 > delegated identity mode. The portable rule: when a control appears to have no effect, look for the
 > broader grant or the mode that is overriding it rather than for a mistake in the control.
-
----

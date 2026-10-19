@@ -590,9 +590,3 @@ OneLake availability, which exposes the database's own data outward as Delta.
 > exam answer** to a question about which trigger fits a requirement — the reasoning above holds —
 > but check the live documentation before treating any single entry in that support matrix as
 > permanent.
-
----
-
-*Checked against Microsoft's documentation on 17 October 2026, for the skills-measured version
-dated 19 October 2026. Fabric ships monthly and published limits move; where the live documentation and
-this page disagree, the documentation is newer.*

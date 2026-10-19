@@ -45,18 +45,35 @@ is not much room to write one off.
 
 ## What changed in this version
 
-The current outline is dated 21 July 2026, and exactly one thing moved from the previous
-edition. Under *Configure Microsoft Fabric workspace settings*:
+The current outline is **skills measured as of October 19, 2026**. The change from the previous
+edition, dated 21 July 2026, is wording only: no objective was added or removed, and the weights
+did not move. Two bullets lost a plural.
+
+| Skill | Before 19 October 2026 | From 19 October 2026 |
+|---|---|---|
+| Ingest and transform streaming data | Process data by using Eventstreams | Process data by using Eventstream |
+| Optimize performance | Optimize Eventstreams and Eventhouses | Optimize Eventstream and Eventhouse |
+
+Nothing you study changes because of them. Microsoft's own change log is a less reliable guide
+than the outline: it marks the performance group as a minor change, says nothing about the
+streaming bullet, and still lists the workspace-settings group, which did not change this time.
+Set side by side bullet by bullet, the two edits above are the only differences.
+
+The July edition's one real change still matters if your material is older. Under *Configure
+Microsoft Fabric workspace settings*:
 
 > "Configure Dataflows Gen2 workspace settings" was replaced by **"Configure Apache Airflow
 > workspace settings"**.
 
-Microsoft's change log names that area as the one that moved and calls the change minor.
-Setting the two published outlines side by side line by line, nothing else differs. That
-single swap matters more than its size suggests, because most study material still tracks the
-older outline: it will teach you Dataflow Gen2 workspace settings as an examinable objective,
-and it will teach you nothing at all about Apache Airflow workspace settings. If you are
-revising from anything written before August 2026, that is the hole in it.
+Most study material still tracks the outline before that: it will teach you Dataflow Gen2
+workspace settings as an examinable objective, and it will teach you nothing at all about Apache
+Airflow workspace settings. If you are revising from anything written before August 2026, that is
+the hole in it.
+
+If you sit the exam in a language other than English, Microsoft updates localized versions about
+eight weeks after the English one, and you can request an extra 30 minutes if the exam is not
+available in your preferred language. Because this update is wording only, the timing does not
+change what you study.
 
 Microsoft reviews its cloud exams quarterly, and Fabric ships features monthly. Where this
 course and the live documentation disagree, the documentation is newer — but the exam is
@@ -245,7 +262,7 @@ meet and they will leave you overconfident.
 
 ---
 
-*This page describes the exam as Microsoft published it for the version dated 21 July 2026.
+*This page describes the exam as Microsoft published it for the version dated 19 October 2026.
 Fabric changes quickly. Where a documentation page you find during the exam disagrees with
 something you learned here, the exam is written against the outline above — answer the
 objective.*
