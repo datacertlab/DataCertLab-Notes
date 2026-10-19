@@ -654,7 +654,3 @@ whole run.
 > broader grant or the mode that is overriding it rather than for a mistake in the control.
 
 ---
-
-*Checked against Microsoft's documentation on 17 October 2026, for the skills-measured version
-dated 19 October 2026. Fabric ships monthly and licence names, published limits and engine behaviour all
-move; where the live documentation and this page disagree, the documentation is newer.*
