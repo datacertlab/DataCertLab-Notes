@@ -26,7 +26,7 @@ wrong.
 behaviour is stage-based, so the same job can run fine, run slowly, or be rejected outright
 depending on nothing but recent consumption elsewhere.
 
-**Know which tool answers which layer.** Job execution is the monitoring hub. Query execution is
+**Know which tool answers which layer.** Job execution is the Monitor hub. Query execution is
 query insights. Executor failure is the Spark interface. Reaching for the wrong surface is how a
 question gets lost before the options are read.
 
@@ -44,19 +44,22 @@ flowchart TD
 
 Two surfaces, two layers.
 
-| | Monitoring hub | Query insights |
+| | Monitor hub | Query insights |
 |---|---|---|
 | Layer | Job execution across items | SQL query execution |
 | Scope | Items you have permission to view | Warehouse or SQL analytics endpoint |
-| History | 30 days | 30 days |
 | Answers | Did it run, where did it fail | Which query was slow, and why |
 
-The **monitoring hub** is Fabric's centralised view of job execution health, progress and outcomes.
-Any Fabric user can open it, but sees only activities for items they have permission to view — so a
-colleague who cannot find a failed run has an item-permission problem rather than a monitoring one.
-It answers whether a job is running, succeeded or failed, where it failed and with what error
-details, whether it has failed before in the last 30 days, and which scheduled items have failure
-notifications configured.
+The **Monitor hub**, opened from Monitor in the navigation pane, is where runs across items are
+tracked. Any Fabric user can open it, but sees only activities for items they have permission to view
+— so a colleague who cannot find a failed run has an item-permission problem rather than a monitoring
+one. In its classic view you sort and filter runs by status, item type, start time, submitter or
+location.
+
+> **Currency note.** Microsoft now calls the classic view the legacy Monitoring hub, and a redesigned
+> Monitor hub with pages for job runs, alerts, capacity, applications and agents is in preview.
+> **This does not change the exam answer.** "Monitoring hub" in a question means this place; pick it
+> for job execution whichever name the options use.
 
 **Query insights** holds 30 days of historic query data for a Warehouse or SQL analytics endpoint.
 Two boundaries matter. It covers queries run in a user's context only — system queries are not
@@ -72,12 +75,14 @@ indicators.
 
 A **Dataflow Gen2 refresh** runs on demand or on a schedule, and the schedule allows at most 48 runs
 a day — a floor of half an hour, much coarser than the one-minute floor of the job scheduler. Do not
-confuse that with the separate cap on how many refreshes a dataflow may actually perform in a rolling
-day, which counts on-demand and publish-triggered runs as well and sits far above 48. The one a
-cadence question turns on is the schedule ceiling. It is
-also stricter about who: the user who triggers a refresh needs **Member or higher** on the workspace
-plus access to every connection the dataflow uses, so a Contributor who can edit the dataflow may
-still be unable to refresh it.
+confuse that with the separate cap on how many refreshes a dataflow may actually perform: **300 in a
+rolling 24 hours, or 150 for a Dataflow Gen2 without continuous integration (CI) and continuous
+deployment (CD) support**, counting on-demand and publish-triggered runs as well as scheduled ones.
+Past it an error may appear in the refresh history and refreshes resume once usage drops, and a
+sudden burst can be throttled and rejected even below the cap. The one a cadence question turns on
+is the schedule ceiling. It is also stricter about who: the user who triggers a refresh needs
+**Member or higher** on the workspace plus access to every connection the dataflow uses, so a
+Contributor who can edit the dataflow may still be unable to refresh it.
 
 Two things start a refresh without anyone scheduling or clicking one: a successful publish, and a
 pipeline containing a dataflow activity. That explains most unexplained runs in a refresh history.
@@ -106,7 +111,7 @@ history an item's owner sees.
 
 ### Configuring alerts
 
-Four routes, and they watch different things. Choosing the wrong one is a common way to answer a
+Five routes, and they watch different things. Choosing the wrong one is a common way to answer a
 monitoring question incorrectly while naming a real feature.
 
 | Route | Watches | Set up |
@@ -115,9 +120,12 @@ monitoring question incorrectly while naming a real feature.
 | Pipeline-level alert | The run outcome | On the pipeline |
 | Failure notifications | Scheduled run failures | Under the pipeline's Schedule settings |
 | Activator rule | The data itself | As a rule on an object |
+| Workspace-level alert | Every job run in a workspace | One rule over workspace monitoring |
 
 The activity-level route is the one that surprises people: the alert *is* an activity, an Outlook or
-Teams step placed after whatever you want to know about. **Failure notifications** email named users
+Teams step placed after whatever you want to know about, set to trigger on its failure. Give each
+monitored activity its own: one connected to several activities fires only when all of them fail.
+**Failure notifications** email named users
 or groups when a **scheduled** run fails — so a manually triggered failure sends nothing, which is a
 good distractor.
 
@@ -127,10 +135,18 @@ conditions continuously on objects. Rules can be simple comparisons, or stateful
 "Tell me when the load fails" is a notification. "Tell me when nothing has arrived by nine" is a
 rule, and none of the first three routes can answer it.
 
+**Workspace monitoring** is what makes the fifth route possible. It sends logs and metrics from
+supported items to an Eventhouse in a monitoring item; collection is off until you turn it on and does
+not backfill, and anyone with Contributor or above can query it with KQL. With it on, a single alert
+rule over a KQL queryset of recent failures watches every pipeline and job run in the workspace,
+instead of one alert per pipeline. Real-Time hub adds one more way in: you can set an alert on Fabric
+workspace item events by choosing the events, the condition and the action Activator takes. The
+preview Monitor hub gathers failure emails and Activator-based job alerts on one page.
+
 <details>
 <summary><b>Self-check — where to look</b></summary>
 
-1. A colleague says a pipeline run is missing from the monitoring hub. What do you check?
+1. A colleague says a pipeline run is missing from the Monitor hub. What do you check?
 2. A Viewer can see that a query was slow but not what it was. Is that a fault?
 3. A dataflow refresh is slow and none of its queries look expensive. What would you check first?
 
@@ -187,10 +203,12 @@ refreshes keep running while a capacity recovers. Most people assume the opposit
 That table is the default experience, not a universal rule, and the same page lists workloads that
 behave differently. An **eventstream** is not rejected — an operation that is meant to run for years
 gains nothing from being refused, so Fabric starves it instead, reducing the capacity units keeping
-the stream open until the capacity recovers. **Real-Time Intelligence** skips the delay stage
-altogether, because a product whose name promises real time cannot answer by pausing, and it is
-throttled only once the rejection phase is reached. Learn the two shapes rather than a list: a
-stream is starved, and real-time work is never merely slowed.
+the stream open until the capacity recovers. **Real-Time Intelligence** skips the 20-second delays,
+because a product whose name promises real time cannot answer by pausing, and its throttling begins
+at the rejection phase. That does not make it immune in the meantime: an Eventhouse's own throttling
+log records an *Interactive Delay* state in the same window, in which responses might be slower
+because autoscale is disabled. Learn the two shapes rather than a list: a stream is starved, and
+real-time work skips the 20-second delay.
 
 > **Currency note.** Microsoft states on that page that it might change or update the throttling
 > policy. **This does not change the exam answer.** The order of the stages is what a question turns
@@ -241,7 +259,7 @@ The diagnosis is the executor exit code, read from the Executors tab of the Spar
 | `134` | Aborted | Java virtual machine crash |
 | `1` | General error | User code exception or misconfiguration |
 
-`137` is the one to recognise. It means the data an executor processed exceeded its heap and overhead
+`137` is the one to recognise. It most likely means the data an executor processed exceeded its heap and overhead
 together. Microsoft names six common triggers, and each has a different fix — so the exit code
 narrows the question rather than answering it.
 
@@ -279,6 +297,84 @@ large broadcast join. A runtime version change under the workspace.
 
 ---
 
+## Errors, product by product
+
+Each product reports its failures in its own place, and the exam's error objective names them one by
+one. Read the symptom against this table before you read the options.
+
+| Product | Symptom | What it means |
+|---|---|---|
+| Pipeline | Failed on purpose with your own error code | A Fail activity fired |
+| Pipeline | ForEach says the value is a String, not an array | The array arrived from Execute Pipeline as a string |
+| Dataflow Gen2 | The schedule stopped running and the owner got an email | Consecutive failures paused it |
+| Dataflow Gen2 | Refreshes error, then work again later | The rolling refresh cap was reached |
+| Notebook | Session timed out after inactivity | The 20-minute default shut it down |
+| Eventstream | Data stops reaching a destination | Read the Runtime logs |
+| OneLake shortcut | One user sees nothing through it | They lack access to the target |
+| T-SQL | A rollback runs on success, or never | Transaction statements in the wrong block |
+
+**Pipelines.** A **Fail activity** fails a pipeline deliberately, with a custom error message and code
+that appear in the run history and logs, and it usually sits behind an If Condition that tests for the
+problem. That is how a pipeline reports "the file arrived empty" as a failure rather than a success. A
+different failure catches people who pass arrays between pipelines: an Execute Pipeline activity hands
+its array parameter to the child **as a string**, so a ForEach over it fails until the value is
+wrapped in the create array function.
+
+**Dataflows Gen2.** A scheduled refresh that keeps failing does not keep failing forever: Fabric
+**pauses the refresh schedule and emails the dataflow's owner**. A dataflow whose schedule went
+quiet after a run of failures is paused, not broken in some new way, so fix the failure and turn the
+schedule back on. A refresh history that shows errors and then recovers without anyone touching it
+points the other way, at the rolling cap of 300 refreshes, or 150 for a non-CI/CD dataflow.
+
+**Notebooks.** A session shuts down after a period of inactivity, 20 minutes by default. Rerun the
+notebook to start a new session, or raise the timeout at the notebook or workspace level.
+
+**Eventstreams** have two monitoring views. **Data insights** shows metrics for the stream, each
+source and each destination; **Runtime logs** hold the engine's warnings, errors and information
+entries, and they are where a destination's failures are explained.
+
+**OneLake shortcuts** within one tenant use passthrough authentication by default: each reader's own
+identity goes to the target, so a reader sees only the target data they could read directly. A
+shortcut that works for its creator and returns nothing for a colleague is a permission on the
+target, not a broken shortcut. Cross-tenant and external shortcuts are delegated instead.
+
+**T-SQL.** With TRY/CATCH, begin and commit the transaction inside the TRY block and roll it back
+inside the CATCH block, which only runs when something in TRY failed.
+
+```sql
+BEGIN TRY
+    BEGIN TRANSACTION;
+    -- statements
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    ROLLBACK TRANSACTION;
+END CATCH
+```
+
+The Warehouse also applies **snapshot isolation** to every transaction and ignores a T-SQL change of
+isolation level, so write-write update conflicts are possible. Conflicts are checked per table, not
+per row, so two jobs updating different rows of one table can still collide. What reduces them is
+avoiding concurrent `UPDATE`, `DELETE` and `MERGE` on the same table, and retrying a failed
+transaction after a delay. And some commands are not supported at
+all, including triggers, materialized views and manually created multi-column statistics; Microsoft
+warns that these can cause problems even when they appear to succeed.
+
+<details>
+<summary><b>Self-check — errors by product</b></summary>
+
+1. A child pipeline's ForEach fails, saying its input is a String. What do you change?
+2. A colleague gets no rows through a shortcut that works for you. Where is the problem?
+3. In a TRY/CATCH block, where does `ROLLBACK TRANSACTION` go?
+
+Answers: wrap the parameter in the create array function, because Execute Pipeline passed the array
+as a string. In their access to the shortcut's target, since same-tenant shortcuts pass the reader's
+identity through. Inside the CATCH block.
+
+</details>
+
+---
+
 ## Optimising files
 
 Delta table files fragment over time. Fragmentation increases file-operation overhead, reduces
@@ -292,7 +388,7 @@ Four operations, and they are not alternatives to one another.
 | `OPTIMIZE` | Rewrites small files into right-sized ones | Reads have slowed as the table grew |
 | `ZORDER BY` | Colocates similar values in the same files | Queries filter on two or more columns |
 | V-Order | Reorganises the Parquet file's internals | Reads are heavy and writes can pay 15 percent |
-| `VACUUM` | Deletes unreferenced files past retention | Storage cost, never query speed |
+| `VACUUM` | Deletes unreferenced files past retention | Storage cost; little speed by itself |
 
 ```mermaid
 flowchart TD
@@ -328,6 +424,18 @@ OPTIMIZE is idempotent, but an oversized `minFileSize` increases write amplifica
 threshold at 1 GB, a 900 MB file can be rewritten after a small extra write, again and again. Tuning
 it upward to get bigger files can make the maintenance job the cost.
 
+Better still is not to fragment the table in the first place. For streaming or microbatch writes,
+Microsoft recommends **optimize write** with **auto compaction**; for a table already full of small
+files, one `OPTIMIZE` and then auto compaction from there on. Set both as **table properties** rather
+than in a session, because table properties persist for every session and every writer.
+
+```sql
+ALTER TABLE sales_silver SET TBLPROPERTIES (
+  'delta.autoOptimize.optimizeWrite' = 'true',
+  'delta.autoOptimize.autoCompact' = 'true'
+)
+```
+
 ### V-Order
 
 **V-Order** is a write-time optimization of the Parquet file's internals — row-group distribution,
@@ -345,10 +453,8 @@ missed — the two solve different problems.
 | Applied | At write time | By OPTIMIZE |
 | Helps | Read efficiency generally | File skipping on selective filters |
 
-> **Currency note.** V-Order is **disabled by default for all newly created workspaces**, to favour
-> write-heavy data engineering. Older material says the opposite, and much of it is still in
-> circulation. Answer what the current documentation says. A candidate who remembers the old default
-> will mark the right option wrong.
+V-Order is **disabled by default for all newly created workspaces**, to favour write-heavy data
+engineering, so on a new workspace it is off until someone turns it on.
 
 It can be switched on at three scopes: for a session with `spark.sql.parquet.vorder.default`, for a
 table with the `delta.parquet.vorder.enabled` table property, or for a single write with the
@@ -366,8 +472,9 @@ df.write.mode("overwrite") \
 older than the retention threshold. Both conditions, not either — which is why a vacuum can appear to
 free nothing.
 
-Two things about it are examinable. It **does not improve query performance** the way compaction or
-file-layout optimization does; its purpose is storage cleanup. And because it deletes permanently
+Two things about it are examinable. It **does not improve query performance by itself** the way
+compaction or file-layout optimization does; its main purpose is storage cleanup. That is why it
+belongs in a maintenance routine alongside `OPTIMIZE` rather than in place of it. And because it deletes permanently
 from OneLake, it removes the ability to time travel to the versions whose files it cleaned, so
 retention is a design decision rather than a housekeeping setting.
 
@@ -383,9 +490,9 @@ workflows. The Maintenance interface is the answer whenever a stem says the team
 2. A team runs VACUUM weekly and query times have not improved. What did they expect wrongly?
 3. Where can you not run VACUUM?
 
-Answers: OPTIMIZE — frequent small writes fragment the table, and compaction rewrites the small files
-into right-sized ones. That VACUUM speeds up reads; it is storage cleanup and Microsoft says so
-outright. In the SQL analytics endpoint or the warehouse SQL editor.
+Answers: OPTIMIZE now, then optimize write and auto compaction as table properties so future
+writes stay large. That VACUUM would speed up reads; by itself it is storage cleanup. In the SQL
+analytics endpoint or the warehouse SQL editor.
 
 </details>
 
@@ -409,6 +516,17 @@ Manual statistics are managed with `CREATE STATISTICS`, `UPDATE STATISTICS` and 
 and inspected with `DBCC SHOW_STATISTICS`. They are worth the effort on columns heavily used in the
 query workload — specifically in `GROUP BY`, `ORDER BY`, filters and joins — and worth refreshing
 after data changes that significantly alter row count or distribution.
+
+On the Spark side, the **native execution engine** makes Spark processing faster and cheaper, and it
+now supports a user-defined function (UDF) written in Python or Scala, and complex types, so keeping
+a UDF no longer means giving up the speed. That support needs Runtime 1.3 or 2.0. Switch it on for a session with `%%configure` and `"spark.native.enabled": "true"`, and off for one
+query with `SET spark.native.enabled=FALSE`. Its gain is largest when a query avoids unsupported
+features that trigger fallback.
+
+**Pipelines** go faster through parallelism: a ForEach can run copy activities side by side, one copy
+activity reads and writes with several threads, and intelligent throughput optimization balances CPU,
+memory and network for the run. A **Dataflow Gen2** is tuned with Fast Copy, query folding and staging,
+using the staging lakehouse and warehouse that come with it.
 
 <details>
 <summary><b>Self-check — query optimisation</b></summary>
@@ -442,15 +560,25 @@ table you already have and cannot afford to query repeatedly. Precomputing is th
 counterpart to compaction on the lakehouse side: rather than rearranging the data so the query is
 cheaper, you run the query once and keep the answer.
 
+An eventhouse also **suspends when nobody uses it**, to save cost, and the first query after that
+waits a few seconds while it reactivates. **Capacity Planner mode**, which Microsoft previously called
+Always-on, keeps it always active, and a weekly minimum capacity schedule can sit on top of
+it. An eventstream is scaled by its **event throughput** setting instead: Low below 10 MB/s, Medium
+from 10 to 100, High above 100.
+
+> **Currency note.** Older questions, including Microsoft's own practice assessment, say *Always-on*.
+> **This does not change the exam answer.** It is the same setting under its new name; pick it
+> whichever name the options use.
+
 ---
 
 ## Traps worth carrying into the exam
 
-> **Trap.** V-Order is disabled by default in new workspaces. The portable rule: when a default has
-> changed recently, the confident answer is the outdated one.
+> **Trap.** V-Order is disabled by default in new workspaces. The portable rule: answer the current
+> default, not the one a feature's reputation suggests.
 
-> **Trap.** VACUUM does not speed up queries. The portable rule: match the operation to the symptom
-> — compaction for slow reads, vacuum for storage cost.
+> **Trap.** VACUUM is not the fix for a slow table on its own. The portable rule: match the operation
+> to the symptom — compaction for slow reads, vacuum for storage cost.
 
 > **Trap.** `MaxExecutorFailures` is a symptom. The portable rule: when an error reports that
 > something failed too many times, the question is why it failed once.
@@ -461,6 +589,6 @@ cheaper, you run the query once and keep the answer.
 
 ---
 
-*Checked against Microsoft's documentation on 10 September 2026, for the skills-measured version
-dated 21 July 2026. Fabric ships monthly and published limits, defaults and runtime versions all
+*Checked against Microsoft's documentation on 17 October 2026, for the skills-measured version
+dated 19 October 2026. Fabric ships monthly and published limits, defaults and runtime versions all
 move; where the live documentation and this page disagree, the documentation is newer.*

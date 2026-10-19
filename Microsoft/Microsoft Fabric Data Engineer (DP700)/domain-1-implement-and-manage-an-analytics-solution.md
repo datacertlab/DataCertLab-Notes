@@ -182,6 +182,11 @@ holding ReadAll see its data.
 > restricted role you carefully scoped does nothing — because the grant model means one role cannot
 > deny what another role allows, and DefaultReader is another role. Check it before you add anyone
 > to a restricted role.
+>
+> On a lakehouse, DefaultReader's members are everyone with ReadAll, added as a virtual group, and
+> virtual members cannot be removed one by one. In practice you narrow or remove DefaultReader itself
+> and grant each group what it needs in scoped roles. Delete it and everyone who relied on it loses
+> data access, even though they still hold ReadAll.
 
 Within a role you can refine access at three levels of granularity.
 
@@ -237,7 +242,8 @@ security, which errors through the SQL analytics endpoint and filters in a Spark
 
 A Fabric Warehouse and a SQL analytics endpoint have their own access control, and it is ordinary
 T-SQL. Object-level security there is managed with the `GRANT`, `REVOKE` and `DENY` statements, and
-users can be assigned to custom and built-in database roles.
+users can be assigned to custom and built-in database roles. A grant reads
+`GRANT SELECT ON dbo.Sales TO [ana@contoso.com];`, with an optional `OBJECT::` before the name.
 
 ### Which mechanism is actually in force
 
@@ -274,14 +280,21 @@ This is the place where habit from SQL Server produces a confidently wrong answe
 limits exposure by masking values to non-privileged users, and the data in the database is not
 changed — which is exactly why existing applications keep working without modification. A central
 masking policy acts directly on the sensitive fields, privileged users can be designated to see
-through it, and the masks are defined with ordinary T-SQL. Four types of mask are available.
+through it with `GRANT UNMASK`, and the masks are defined with ordinary T-SQL. Four types of mask are available.
 
 | Mask | What it does |
 |---|---|
 | Default | Full masking, according to the field's data type |
-| Email | Reveals the first letter and the domain suffix |
+| Email | Reveals the first letter and a constant `.com` suffix, as `aXXX@XXXX.com` |
 | Random | Substitutes a random value, for numeric types |
 | Custom string | Reveals a chosen prefix and suffix, pads the middle |
+
+Expect the T-SQL on screen, not just the names. A mask is added with `MASKED WITH (FUNCTION = ...)`, and
+the four functions are written `default()`, `email()`, `random(start, end)` and
+`partial(prefix,[padding],suffix)`. The two numbers in `partial` count the characters shown at each
+end, and the middle argument is the literal padding. Microsoft's own example,
+`ALTER COLUMN [Phone Number] ADD MASKED WITH (FUNCTION = 'partial(1,"XXXXXXX",0)')`, turns
+555.123.1234 into 5XXXXXXX.
 
 Its limitation is the examinable part. Masking does not prevent a user connecting directly and
 running exhaustive queries that expose pieces of the sensitive data, so Microsoft's own advice is to
@@ -334,8 +347,18 @@ item meets the organisation's standards, and anyone else can only request it. Bo
 master data have to be enabled by a Fabric administrator before they appear at all, and certification
 enablement can be delegated to domain administrators so each business area has its own reviewers.
 
-**Auditing** answers what happened. Reading the activity log requires the Fabric administrator role.
-Most audit events show up within 30 minutes, and retrieval can lag by up to 60 — so a query run
+**Auditing** answers what happened. Reading the Power BI activity log, which is what the activity
+events interface returns, requires the Fabric administrator role. That log is not the whole story:
+Fabric user activities are tracked in the **audit log** in the Microsoft Purview portal, and reading
+it needs the Audit Logs role in Exchange Online, which is not a Fabric role at all. Its search covers
+the past seven days unless you widen it.
+
+| Log | Where you read it | What you need |
+|---|---|---|
+| Power BI activity log | Activity events interface | Fabric administrator role |
+| Fabric audit log | Microsoft Purview portal | Audit Logs role in Exchange Online |
+
+In the activity log, most audit events show up within 30 minutes, and retrieval can lag by up to 60 — so a query run
 immediately after an incident can legitimately return nothing, and that is not a fault.
 
 Exporting is shaped by two limits. The activity events interface supports at most one day of data per
@@ -359,11 +382,14 @@ only administrator-specified users certify. No; CSV is named as an unsupported p
 
 Now that the roles exist, "Admin only" means something.
 
-**Spark compute.** Every new workspace is created with a **starter pool** already associated with it,
-sized behind the scenes from the capacity licence that was purchased. Starter pools are prehydrated
-and medium-sized, which is why a session starts in roughly five to ten seconds. A **custom Spark
-pool** lets you size nodes, autoscale and allocate executors for the job, at a session start nearer
-three minutes.
+**Spark compute.** Every new workspace is created with a **starter pool** already associated with
+it, and it is prehydrated, which is why a session starts in roughly five to ten seconds. Its nodes
+are Medium on every capacity stock-keeping unit (SKU); what the SKU you bought sets is how many
+nodes it gets, by default and at most. A **custom Spark pool** lets you size nodes, autoscale and
+allocate executors for the job, at a session start nearer three minutes — unless you configure it as
+a custom live pool, which brings the start down to about five seconds. A live pool needs that custom
+Spark pool first, because starter pools are not supported for custom live pools. So "a bigger pool
+without slower starts" is a custom live pool, not a reason to stay on the starter pool.
 
 Changing any Spark setting in a workspace requires the Admin role. Creating a custom pool needs one
 thing more: the capacity admin must have enabled customised workspace pools in the capacity's Spark
@@ -386,7 +412,7 @@ Three roles govern domains, and they differ in reach rather than in kind.
 |---|---|---|
 | Fabric admin or higher | Yes | Every domain in the tenant |
 | Domain admin | No | Only the domains they administer |
-| Domain contributor | No | The domains they contribute to |
+| Domain contributor | No | No Domains tab; assigns workspaces they administer |
 
 A Fabric admin creates and edits domains, names the domain admins and contributors, and associates
 workspaces. A domain admin sees and edits only their own domains, where they can update the
@@ -394,6 +420,11 @@ description, define contributors, associate workspaces and override some tenant 
 override is the whole point of the model: it is federated governance in practice rather than in
 principle, and endorsement is the worked example — certification enablement can be handed to domain
 administrators so each business area certifies its own content.
+
+A **domain contributor** is a workspace admin whom a domain or Fabric admin has authorised to assign
+their own workspaces, which they do from the workspace's settings. Out of the box that is everyone in
+the organisation, because the domain setting defaults to it, so a workspace admin assigning their
+workspace to a domain is normal behaviour rather than a breach.
 
 **Apache Airflow jobs** are the newest thing in this objective, and they replaced Dataflow Gen2
 workspace settings in the current exam outline. An Apache Airflow job is the next generation of Azure
@@ -456,6 +487,14 @@ updating need three things together, not any one of them: Contributor with write
 items, ownership of the item where a tenant switch blocks non-owners, and build permission on
 external dependencies where they apply.
 
+**Update is all or nothing.** It takes the entire branch and syncs the workspace to the most recent
+commit, and you cannot pick items. The workspace therefore always lands on the newest commit, so an
+older version has to become the newest commit in the repository before an update can bring it back.
+
+A Fabric **SQL database** uses the same integration. Committing converts the live database into code
+in the repository, and updating validates that code before applying a differential change, which is
+how schema edits typed straight into the query editor gain a history.
+
 One provider difference is examinable. If the workspace and an Azure repository sit in different
 regions, the tenant admin must enable **cross-geo export**. That restriction does not apply to
 GitHub.
@@ -476,13 +515,20 @@ rule in production, and content deployed from test inherits the value.
 A data source rule only works when the new source is the same type as the old one, which quietly
 invalidates a plausible design.
 
+You do not have to deploy a whole stage. **Selective deployment** moves only the items you pick, and
+*select related* adds the items they depend on. Pipelines also carry their own permission: **pipeline
+admin** is the lowest, it is needed for every pipeline operation including editing the pipeline's
+settings, and deploying also needs Contributor or higher on the workspaces involved. A workspace role
+on its own never lets anyone change a pipeline.
+
 ### Schema as code
 
 A **database project** holds a warehouse's schema objects outside the portal, in Visual Studio Code,
 where it is built and validated before being published back to the warehouse. That build step is the
 point: schema errors surface before deployment rather than after. You need Visual Studio Code, the
 .NET software development kit, and two extensions — SQL Database Projects and SQL Server — plus
-Contributor or higher on the warehouse item.
+Contributor or higher on the warehouse item. A project can start from scratch or from an existing
+warehouse, and only **SDK-style** projects are supported for a Fabric warehouse.
 
 > **Currency note.** Fabric warehouse database projects carry a preview notice. **This does not
 > change the exam answer.** The guide's own policy admits preview features where they are commonly
@@ -545,7 +591,7 @@ The floor is the useful figure.
 
 Anything that must happen faster than a minute, or in response to something rather than at a time, is
 not a scheduling problem. The scheduler also skips a run outright when the configured time is not
-valid, so a schedule with an end time before its start time simply never fires.
+valid, and waits for the next valid time.
 
 Two limits explain a class of failure. Fabric caps each item at 100 concurrent jobs and fails
 anything submitted beyond that, counting a job as active from starting through queueing to running.
@@ -609,6 +655,6 @@ whole run.
 
 ---
 
-*Checked against Microsoft's documentation on 10 September 2026, for the skills-measured version
-dated 21 July 2026. Fabric ships monthly and licence names, published limits and engine behaviour all
+*Checked against Microsoft's documentation on 17 October 2026, for the skills-measured version
+dated 19 October 2026. Fabric ships monthly and licence names, published limits and engine behaviour all
 move; where the live documentation and this page disagree, the documentation is newer.*

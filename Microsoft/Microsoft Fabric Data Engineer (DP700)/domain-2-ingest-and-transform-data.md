@@ -32,8 +32,8 @@ before you read them properly.
 
 ## Where the data should live
 
-Fabric offers two enterprise-scale, open-standard-format storage workloads: the **Warehouse** and
-the **Lakehouse**. Both store data in OneLake in open Delta format, so **the file format decides
+Fabric offers two enterprise-scale, open-format data stores for analytics: the **Warehouse** and the
+**Lakehouse**. Both store data in Delta Lake format in OneLake, so **the file format decides
 nothing**. Microsoft's own decision guide turns on three questions.
 
 | Question | Answer | Store |
@@ -45,12 +45,17 @@ nothing**. Microsoft's own decision guide turns on three questions.
 
 The multi-table transactions row is the sharpest, because it is a capability rather than a
 preference. The Warehouse provides full multi-table transactional guarantees through the SQL engine;
-the Lakehouse does not. Notice too that the guide treats **not knowing the shape of the data** as a
+the Lakehouse does not offer that. Notice too that the guide treats **not knowing the shape of the data** as a
 reason to choose the Lakehouse — an unusually candid thing for a vendor to publish, and a useful
 heuristic when a stem describes an exploratory workload.
 
-The Warehouse is also the "no knobs" option: no configuration of compute or storage. The Lakehouse
-stores and analyses structured and unstructured data in one place.
+The Warehouse is also the "no knobs" option, with no compute or storage configuration to tune. The
+Lakehouse stores and analyses structured and unstructured data in one place.
+
+Two more stores sit beside them in Microsoft's wider data store guide. An operational, transactional
+or normalised relational workload belongs in **SQL database in Fabric**, and streaming event data with
+high-granularity interactive analytics belongs in an **eventhouse**. The Warehouse is the guide's answer
+for enterprise warehousing, not for every table that has a primary key.
 
 ```mermaid
 flowchart TD
@@ -84,7 +89,7 @@ Two structural rules matter.
 | Lakehouse, Files folder | Any level, but no table discovery happens |
 | Item types | Lakehouses and Kusto Query Language databases only |
 
-The last row rules out a plausible wrong answer: you cannot create a shortcut in a Warehouse.
+The last row is the whole of Microsoft's list, which is why a Warehouse is not where a shortcut goes.
 
 > **Trap.** The Delta format does not support tables with a space in the name, and OneLake does not
 > recognise a shortcut whose name contains a space as a Delta table in the lakehouse. The shortcut
@@ -165,10 +170,10 @@ Three routes, one question:
 A full load re-reads everything. An **incremental** load reads only what changed — and which
 incremental method is available is decided by the source, not by preference.
 
-| Method | When it applies | Handles deletes |
+| Method | When it applies | How it finds changes |
 |---|---|---|
-| Change data capture | Source database has it enabled | Yes |
-| **Watermark-based** incremental copy | Source does not | No |
+| Change data capture | Source database has it enabled | Reads the source's inserts, updates and deletes |
+| **Watermark-based** incremental copy | Source does not | Compares an incremental column with the last run |
 
 A Copy job detects which source tables have change data capture enabled and lets the method be
 chosen **per table**, not per job. There is a documented limit on that, and it is the kind of
@@ -177,11 +182,10 @@ tables that do not, and the job treats every one of them as watermark-based.** S
 selection does not run both methods — it quietly drops to the weaker one, and the tables that
 could have tracked deletes stop doing so.
 
-The discriminator is deletes. Change data capture replicates inserts, updates and deletes exactly.
-A watermark compares an incremental column such as a timestamp or an identifier against the last
-run, so a row that has been deleted simply stops appearing at the source and is never deleted
-downstream. If a stem mentions removed records having to propagate, a watermark cannot be the
-answer.
+The discriminator is deletes. Change data capture is the method Microsoft documents as replicating
+inserts, updates and deletes. A watermark compares an incremental column such as a timestamp or an
+identifier against the last run, and a deleted row leaves no new value behind to compare. If a stem
+says removed records must propagate, choose change data capture.
 
 The write side maps to dimensional patterns: the update method chosen corresponds to the **slowly
 changing dimension** patterns, with type 1 applied as a merge.
@@ -245,7 +249,10 @@ change: the attributes are updated in place and the inferred member flag is set 
 them as a dimension change would write a history row for something that never happened. The same
 update means two different things depending only on how the row got there.
 
-One dimension can support type 1 and type 2 changes together; they are not exclusive.
+A **type 2** change is the one that keeps history: it inserts a new time-based version of the
+member rather than overwriting it, which is why Microsoft reserves it for attributes that must
+preserve historical perspective. One dimension can support type 1 and type 2 changes together;
+they are not exclusive.
 
 <details>
 <summary><b>Self-check — dimensional loading</b></summary>
@@ -283,6 +290,37 @@ with no code skills, the answer is a dataflow.
 The two engine choices that look like preferences and are not: T-SQL and Kusto Query Language are
 each tied to a store. You do not choose Kusto Query Language for a lakehouse table.
 
+Expect each engine's code on screen, and read it rather than write it. A **Kusto Query Language**
+query is a table name followed by piped operators that filter, transform, aggregate or join.
+
+```kusto
+stock
+| where ["time"] > ago(5m)
+| summarize avgPrice = avg(todouble(bidPrice)) by symbol
+| project symbol, avgPrice
+```
+
+`summarize` aggregates the input table. **`extend` appends** calculated columns and keeps the rest,
+while **`project` returns only** the columns it names. `parse_json()` turns a JSON string into a
+`dynamic` value whose properties you can then address.
+
+In the Warehouse, **`COPY INTO`** loads files in bulk. A wildcard such as `*.csv` loads many files in
+one statement, matching is case-sensitive and expands into subfolders, and reading OneLake folders
+needs no credential. For CSV, the **rejected row location** sends rows that fail to a separate location
+instead of failing the whole load; in the statement itself the parameter is written `ERRORFILE`.
+That alone does not keep the load alive: it succeeds only while the rejected rows are fewer than
+`MAXERRORS`, which defaults to 0, and the identity reading the source must be able to create files in
+the error path. **`CREATE TABLE AS SELECT`** builds a new table from a query, while
+`INSERT` with a `SELECT` adds rows to one that already exists, and both can read other warehouses and
+lakehouses through three-part names.
+
+A **PySpark** DataFrame is filtered with `where`, narrowed with `select` and aggregated with `groupBy`
+plus an aggregate function.
+
+```python
+df.select("ProductID", "Category").groupBy("Category").count()
+```
+
 ---
 
 ## Streaming: which engine
@@ -297,14 +335,22 @@ Hub, plus a custom endpoint that applications or Kafka clients reach with a conn
 Eventstreams also expose Apache Kafka endpoints, so an existing producer can send events without
 being rewritten.
 
+An eventstream does have a code path when you want one: a **SQL operator** lets you write the
+transformation as SQL expressions inside the stream.
+
 **Spark structured streaming** is a code-based streaming query, with triggers and output modes.
 Stateful queries add a state store and checkpoints; a stateless one needs neither. Choose it for
-logic an eventstream cannot express.
+logic an eventstream cannot express. A **Delta table read as a stream** carries appends only: updates
+or deletes in that table can stop the stream unless the read sets `ignoreChanges` or `ignoreDeletes`.
+
+```python
+spark.readStream.format("delta").option("ignoreChanges", "true").table("orders_in")
+```
 
 ```mermaid
 flowchart TD
   A["Write code?"] -->|No| B["Eventstream"]
-  A -->|Yes| C["Session<br/>windows?"]
+  A -->|Yes| C["Lakehouse sink or<br/>session windows?"]
   C -->|Yes| D["Microbatch"]
   C -->|No| E["Real-time<br/>mode"]
 ```
@@ -340,6 +386,10 @@ A processing-time interval of `"0 seconds"` starts each microbatch as soon as th
 execution sustains, and its cost is many small writes when input is sparse. A fixed interval batches
 events into larger writes.
 
+`start()` and `toTable()` launch the query **asynchronously**. In a scheduled notebook or a Spark job
+definition, an active query does not keep the run alive: the run reaches a terminal state unless it
+calls `query.awaitTermination()` for each query it has to wait for.
+
 **Available now** processes everything present when the query starts and stops. Reusing one
 checkpoint across scheduled runs gives incremental, stateful processing without a long-running
 application — offset tracking, deduplication state and aggregation state all come free. Microsoft
@@ -367,9 +417,13 @@ things Spark is tracking. Watermarks and time to live are what actually **remove
 longer needed. A watermark does that by fixing how late an event may arrive and still be counted,
 which is why it belongs to windowing and deduplication in particular.
 
+The levers are not interchangeable. A **stream-stream join** buffers rows from both sides until Spark
+can tell whether a match will arrive, and it needs an **event-time range condition** beside its
+watermarks before Spark can drop those rows. **Time to live** is the lever for custom state you write
+with `transformWithState`, where it evicts stale keys without waiting for an input event.
+
 The checkpoint tracks offsets, query progress and state store data, and a restart against the same
-checkpoint location reloads state and resumes from the last committed progress. Point a query at a
-new checkpoint and it silently reprocesses from the beginning. Checkpoints must be durable and must
+checkpoint location reloads state and resumes from the last committed progress. Checkpoints must be durable and must
 not be shared between queries, and because the state schema and query plan are checkpointed, a major
 change to stateful logic often needs a new one.
 
@@ -413,6 +467,12 @@ window type is even considered.
 | Deduplication within a watermark | Supported |
 | Session windows | Not supported — use a microbatch trigger |
 
+Eventstream windows are written differently, in the SQL operator. A **tumbling** window is fixed-size
+with no overlap, `TumblingWindow(minute, 10)`; a **hopping** window adds a hop size and overlaps when
+the hop is shorter than the window, `HoppingWindow(minute, 15, 1)`. `Windows()` runs one query over
+several windows at once and returns their union, so name each with `Window(id, definition)` and read
+the name back with `System.Window().Id`. Either every window gets a name or none does.
+
 ### Duplicates, missing values and late arrivals
 
 Three problems the objective names together, and structured streaming answers all three with the
@@ -428,8 +488,9 @@ remembers the keys it has already seen, and the watermark is what stops that mem
 limit. Choosing keys that identify a logical event, rather than a physical delivery, is the part
 that needs thought.
 
-**Missing values** are ordinary transformation and data-quality work — `fillna`, `dropna`, or a join
-against a reference set. Nothing streaming-specific about them.
+**Missing values** are ordinary data-quality work rather than a streaming problem. In a notebook,
+Data Wrangler shows how many values are missing in its summary and offers *Drop missing values*, *Fill
+missing values* and *Drop duplicate rows*, so dropping is not the only option.
 
 Do not confuse that with an **inferred member**, which is a dimensional-loading pattern and a
 different problem entirely: there the value is not missing from a row, the whole dimension row is
@@ -481,6 +542,11 @@ managing an ingestion pipeline or keeping duplicate copies.
 > about when to accelerate, which turns on cost against query speed. Do not reject acceleration
 > because of a column ceiling the scenario will never reach.
 
+An **update policy** transforms data as it lands rather than when it is read. It runs when new data
+is written to a source table and saves the result to a destination table, with no orchestration of its
+own. It is not transactional unless you set it so, and a transactional policy that fails leaves the
+source table without the new data; a wrong policy query can block ingestion altogether.
+
 **OneLake availability** points the other way. Turning it on creates a logical copy of the Kusto
 database's own data in Delta Lake format, so other Fabric engines can read it — Direct Lake mode in
 Power BI, the Warehouse, the Lakehouse, notebooks. A shortcut is an inbound reference; OneLake
@@ -527,6 +593,6 @@ OneLake availability, which exposes the database's own data outward as Delta.
 
 ---
 
-*Checked against Microsoft's documentation on 10 September 2026, for the skills-measured version
-dated 21 July 2026. Fabric ships monthly and published limits move; where the live documentation and
+*Checked against Microsoft's documentation on 17 October 2026, for the skills-measured version
+dated 19 October 2026. Fabric ships monthly and published limits move; where the live documentation and
 this page disagree, the documentation is newer.*

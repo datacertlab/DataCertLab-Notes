@@ -16,7 +16,7 @@ here comes from Microsoft's own published material for the current version of th
 | | |
 |---|---|
 | Exam code | DP-700 |
-| Exam guide version | Skills measured as of July 21, 2026 |
+| Exam guide version | Skills measured as of October 19, 2026 |
 | Answering time | 100 minutes |
 | Seat time to allow | 120 minutes |
 | Passing score | 700, on a scale that runs from 0 to 1000 |
