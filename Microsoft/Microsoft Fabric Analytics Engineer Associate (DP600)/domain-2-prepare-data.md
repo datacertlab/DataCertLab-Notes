@@ -16,7 +16,7 @@ Objective two is transforming: views, functions and stored procedures, enrichmen
 
 Objective three is querying, in four named surfaces.
 
-Underneath all of it is one fact about Microsoft Fabric worth establishing immediately. **Every Fabric data store is available in OneLake in open table format by default**, and a lakehouse and a warehouse share the same SQL engine. So the choice between stores is a choice about the experience you want and the guarantees you need — not a choice that locks your data anywhere. That is why "land it in a lakehouse with Spark, expose it through a warehouse for reporting" is a supported pattern rather than a migration, and why so many questions in this domain are about fit rather than capability.
+Underneath all of it is one fact about Microsoft Fabric worth establishing immediately. **Fabric data stores are available in OneLake in open table format by default.** The one exception is a KQL database in an eventhouse, which reaches OneLake only when you turn on OneLake availability. A lakehouse and a warehouse share the same SQL engine. So the choice between stores is a choice about the experience you want and the guarantees you need — not a choice that locks your data anywhere. That is why "land it in a lakehouse with Spark, expose it through a warehouse for reporting" is a supported pattern rather than a migration, and why so many questions in this domain are about fit rather than capability.
 
 ---
 
@@ -26,32 +26,34 @@ Microsoft publishes a decision guide for this, and it routes five ways.
 
 | Store | Reach for it when | Query it with |
 |---|---|---|
-| Lakehouse | Big data, machine learning, unstructured or semi-structured data | Spark or SQL |
+| Lakehouse | Big data, machine learning, data engineering over unstructured, semi-structured or structured data | Spark or SQL |
 | Warehouse | Enterprise warehousing, SQL-based reporting, full transactions | T-SQL |
 | Eventhouse | Streaming events, high-granularity interactive analytics | KQL or SQL |
 | SQL database in Fabric | Operational transactional workloads | T-SQL |
-| Cosmos DB in Fabric | AI, NoSQL and vector search | Its own interfaces |
+| Cosmos DB in Fabric | NoSQL databases | Its own interfaces |
 
-> **Currency note.** Until July 2026 this objective named three stores: lakehouse, warehouse or eventhouse. It now says "Choose between different data stores" and names none. The exam answer is unchanged for those three, and two more are now fair game. Read what the requirement actually needs rather than assuming the answer must be one of the original three — a stem mentioning vector search or row-level application writes has an answer outside them.
+AI development with vector data types appears twice in the guide. It routes to **SQL database in Fabric or Cosmos DB in Fabric**, so a vector requirement alone does not pick either store. What decides is the rest of the stem: a document model with flexible fields points to Cosmos DB, and relational tables with application writes point to SQL database.
 
-Most questions, though, are the lakehouse-versus-warehouse decision, and Microsoft names its own two decision points: **the team's available skill set, and whether multi-table transactions are needed.**
+> **Currency note.** Until July 2026 this objective named three stores: lakehouse, warehouse or eventhouse. It now says "Choose between different data stores" and names none. The exam answer is unchanged for those three, and two more are now fair game. Read what the requirement actually needs rather than assuming the answer must be one of the original three — a stem mentioning a NoSQL document store, vector data or row-level application writes has an answer outside them.
+
+Most questions, though, are the lakehouse-versus-warehouse decision, and Microsoft names its own two decision points: **the team's available skill set, and whether multi-table transactions are needed.** Its lakehouse-versus-warehouse guide adds a third starting point, the data type: unstructured and structured data, or not sure, points to a lakehouse, and structured data only points to a warehouse.
 
 | Question | Lakehouse | Warehouse |
 |---|---|---|
 | Primary development style | Spark | T-SQL |
 | Multi-table transactions | No | Yes |
-| Data types handled | Structured and unstructured | Structured |
+| Data types handled | Unstructured and structured, or not sure | Structured only |
 | Who writes to it | Engineers | Anyone with T-SQL |
 
 Take the skill-set point first. A warehouse lets a team interact primarily with T-SQL while still allowing Spark users in the organisation to reach the same data — choosing it does not lock anyone out. A lakehouse suits a team with mixed skills **where the T-SQL users are consumers**, meaning they do not need to write `INSERT`, `UPDATE` or `DELETE` statements. That condition is the hinge. If analysts must modify rows with T-SQL, the lakehouse route is closed and a warehouse is the answer.
 
-Now the transactions point. A warehouse provides data loading and transforms at scale with full multi-table transactional guarantees supplied by the SQL engine. A lakehouse stores data in Delta Lake format, which gives atomicity, consistency, isolation and durability (ACID) transactions, schema enforcement and time travel — but that is per table. Collapsing this into "lakehouses have no transactions" will lose you marks in both directions. The precise difference is multi-table.
+Now the transactions point. A warehouse provides full multi-table ACID transactions, views, functions and stored procedures through the SQL engine. A lakehouse stores data in Delta Lake format, which gives atomicity, consistency, isolation and durability (ACID) transactions, schema enforcement and time travel — but that is per table. Collapsing this into "lakehouses have no transactions" will lose you marks in both directions. The precise difference is multi-table.
 
-Two more properties worth carrying. A warehouse needs no configuration of compute or storage — Microsoft calls it no-knobs performance — so an option asking you to size compute for a warehouse is wrong. And warehouses support cross-database querying, which is what lets a query reach other warehouses and lakehouse Delta tables using three-part names.
+Two more properties worth carrying. A warehouse applies autonomous workload management with no compute or storage configuration to tune, so an option asking you to size compute for a warehouse is wrong. And a warehouse runs cross-database queries across warehouses and lakehouses with zero data duplication, using three-part names.
 
-From the lakehouse side, the case is breadth rather than guarantees. A lakehouse combines the scalability of a data lake with the querying capability of a warehouse: structured and unstructured data in one location, managed with Delta Lake, analysed with both Apache Spark and SQL. It ingests from many different sources and converts what arrives into a unified Delta format, which is why it is the natural landing zone when the incoming data is messy or varied. And with shortcuts and cross-tenant sharing it can reach governed data held elsewhere without duplicating it at all.
+From the lakehouse side, the case is breadth rather than guarantees. A lakehouse combines the scalability of a data lake with the querying capability of a warehouse: structured and unstructured data in one location, managed with Delta Lake, analysed with both Apache Spark and SQL. It ingests data from many sources and unifies it in open Delta format, which is why it is the natural landing zone when the incoming data is messy or varied. And through OneLake shortcuts it gives live access to external data without copying it.
 
-The other three stores are narrower and easier to recognise. An eventhouse is for time-based streaming events and is Microsoft's preferred engine for semistructured and free text analysis — it queries billions of events in seconds. SQL database in Fabric is for operational transactional workloads, which means row-level application writes rather than analytics. Cosmos DB in Fabric is for AI, NoSQL and vector search. Each has a give-away in the stem, and none of them is a lakehouse or a warehouse wearing a different name.
+The other three stores are narrower and easier to recognise. An eventhouse is for time-based streaming events and is Microsoft's preferred engine for semistructured and free text analysis — it queries billions of events in seconds. SQL database in Fabric is for operational transactional workloads, which means row-level application writes rather than analytics. Cosmos DB in Fabric is for NoSQL databases. Either of the last two can hold vector data for AI development. Each has a give-away in the stem, and none of them is a lakehouse or a warehouse wearing a different name.
 
 A last structural point about eventhouses, because the vocabulary trips people. An eventhouse is a **container** that can hold several databases, which share capacity and resources and are monitored both together and individually. The KQL database is what sits inside it. Decisions about shared capacity and project grouping are eventhouse decisions; decisions about tables are database decisions.
 
@@ -96,7 +98,7 @@ Mirroring is the opposite trade. It continuously replicates an existing data est
 
 When a copy is genuinely needed, Fabric's ingestion decision guide names five options: pipeline copy activity, Copy job, dataflow, Eventstream and Spark.
 
-Copy job moves data from many sources to many destinations **with no pipeline required** — that is its stated point. It supports bulk copy, incremental copy and change data capture replication natively, and it can copy only new or changed data since its last run without hand-built watermark logic.
+Copy job moves data from many sources to many destinations **with no pipeline required** — that is its stated point. It supports bulk copy, incremental copy and change data capture replication natively, and it can copy only new or changed data since its last run without hand-built watermark logic. Which incremental mode a job can use depends on the source: change data capture needs it enabled on the source and supported by the Copy job connector, and watermark copy needs a reliable incremental column such as a modified date.
 
 Pipeline copy activity is the low-code, high-scale option. It handles petabyte-scale movement into lakehouses and warehouses, works against databases, file systems and APIs both on-premises and in the cloud, and spares you writing and maintaining code for each connector. The pattern covers both historical and incremental refresh. Reach for it when the copy is one step inside a larger orchestrated flow.
 
@@ -124,7 +126,7 @@ Two discovery surfaces are named in one objective bullet, and they answer differ
 
 The OneLake catalog is the centralized place to find, explore and use Fabric items and govern the data you own. You reach it from the Fabric navigation pane, and it is also embedded in Microsoft Teams, Microsoft Excel and Microsoft Copilot Studio so people can discover and act on items without leaving those applications. Catalog metadata can also be discovered programmatically across workspaces through the Fabric catalog search interface, which is the answer whenever a stem asks for discovery at scale rather than by hand.
 
-The catalog has three tabs and opens on Explore, which pairs an items list with an in-context details view plus selectors and filters for narrowing the list.
+The catalog has three tabs, Explore, Govern and Secure, and opens on Explore, which pairs an items list with an in-context details view plus selectors and filters for narrowing the list.
 
 Real-Time hub is the other one, and it is the tenant-wide place for streaming data — data that flows continuously rather than sitting in a fixed location. You use it to discover, ingest, manage and consume that data, and what it lists is the streams and Kusto Query Language tables you can act on directly. It also carries out-of-box connectors for pulling those sources into Fabric, which is why the guide files it under getting data rather than under governance.
 
@@ -253,6 +255,8 @@ Most of the objective 2.2 traps are not about which transformation to choose. Th
 
 **Duplicates can be kept rather than removed.** Power Query can filter the data to show only duplicates, which is how you hand the business a list of what is wrong before anything is deleted.
 
+**Filtering** includes or excludes rows according to a specific value in a column. Power Query gives you three ways to do it: the sort and filter menu, the cell shortcut menu, and a type-specific filter such as a date range. Once a column is filtered, a small filter icon appears in its heading.
+
 | What you want to see | What to do |
 |---|---|
 | The type the editor inferred | Read the icon left of the column heading |
@@ -272,18 +276,44 @@ First, which table became the left one: it is whichever was selected first from 
 
 ---
 
+## Joins, new columns and denormalizing
+
+A merge in Power Query is a join, and the join kind you choose decides which rows survive. Read the requirement for two things: which table must keep all its rows, and which table is on the left.
+
+| Join kind | What it brings in |
+|---|---|
+| Left outer | All rows from the left table, plus matching rows from the right |
+| Inner | Only rows that match in both tables |
+| Full outer | All rows from both tables |
+| Left anti | Only left rows with no match in the right table |
+| Right anti | Only right rows with no match in the left table |
+
+A left outer join keeps all the rows from the left table and brings in any matching rows from the right table. That makes it the answer to "keep every sales row even when the geography is missing", provided the sales table is on the left. Swap the tables and the same join kind keeps every geography row instead. An inner join brings in only matching rows from both tables, so the unmatched sales rows disappear. A left anti join brings in only the left rows that have no match, which makes it the exclusion join: "load the sales records that are not in the exceptions table".
+
+Adding a column follows the same no-code-first rule as the rest of this objective. A **conditional column** creates a new column whose values come from one or more conditions applied to other columns. You find it on the **Add column** tab, in the **General** group, and it is the route for an if-then-else label such as High and Regular. A custom column written in M is for when the built-in transformations are not flexible enough.
+
+**Denormalizing** has a specific target. A snowflake dimension is a set of normalized tables for a single business entity, such as product, subcategory and category held in three tables. In Power BI you can mimic that design or combine the tables into a single, denormalized model table, and Microsoft says the benefits of a single model table generally outweigh those of multiple tables. Mimicking the snowflake loads more tables, which is less efficient for storage and performance, and it makes filters travel longer relationship chains. So when a stem asks you to reduce joins and model complexity, the tables you denormalize are the snowflaked dimension tables. The fact table keeps its keys and its measures.
+
+<details>
+<summary><b>Self-check.</b> In Dataflow Gen2 you merge FactSales with DimGeography and must keep every FactSales row, matched or not. Which join kind, and which table goes first?</summary>
+
+Left outer, with FactSales as the left table and DimGeography as the right. An inner join would drop the sales rows that have no geography match, and with DimGeography on the left a left outer join would keep the geography rows instead.
+</details>
+
+---
+
 ## Four ways to ask the same question
 
-Objective 2.3 has four sub-bullets and each names a surface: select, filter and aggregate using the Visual Query Editor, using SQL, using KQL, and using DAX. The exam expects you to choose between them.
+Objective 2.3 has four sub-bullets and each names a surface: select, filter and aggregate using the visual query editor, using SQL, using KQL, and using DAX. The exam expects you to choose between them.
 
 | Surface | Language | Use it when |
 |---|---|---|
-| Visual Query Editor | None, it is no-code | The person does not write code |
+| Visual query editor | None, it is no-code | The person does not write code |
 | SQL query editor | T-SQL | Querying a warehouse or endpoint |
 | KQL queryset | KQL, plus many SQL functions | Querying an eventhouse |
 | DAX query view | DAX | Querying a semantic model |
 
-The Visual Query Editor is an explicitly no-code experience available for the SQL analytics endpoint, warehouse and mirrored database. You build a query by dragging tables from the object explorer onto a canvas. When a stem describes an analyst who does not write SQL, this is the keyed answer — not a simplified query.
+The visual query editor is an explicitly no-code experience available for the SQL analytics endpoint, warehouse and mirrored database. You build a query by dragging tables from the object explorer onto a canvas. When a stem describes an analyst who does not write SQL, this is the keyed answer — not a simplified query.
 
 Alongside it, the SQL query editor writes T-SQL in the portal, external tools connect over a SQL connection string, and the data preview shows content quickly. Three surfaces over one store, which is why the objective asks you to pick.
 
@@ -312,6 +342,39 @@ Two practical notes on choosing between the four surfaces. First, the store usua
 <summary><b>Self-check.</b> A stem shows four DAX snippets and asks which runs as a query. One begins with `EVALUATE` `SUM`(Sales[Amount]). Is it correct?</summary>
 
 No. `SUM` returns a scalar, and `EVALUATE` must be followed by a table expression. To return that value as a query result it has to be wrapped in curly braces as a table constructor. This is the single most reliable near-miss in DAX query questions: the function is real, the syntax is almost right, and the reason it fails is nameable.
+</details>
+
+---
+
+## The SQL the answer options will show you
+
+Questions on the SQL bullet often put four complete statements in front of you and ask which one meets the requirement. The differences between them are small and always fall in the same places.
+
+**Filtering a group needs `HAVING`.** `HAVING` specifies a search condition for a group or an aggregate. It is used only with `SELECT`, and typically with `GROUP BY`. `WHERE` filters individual rows before they are grouped, so it cannot test a total. A requirement that says "only the products whose yearly sales exceed 10,000" is a `HAVING` requirement:
+
+```sql
+SELECT p.ProductName, d.[Year], SUM(s.SalesAmount) AS Sales
+FROM dbo.FactSales AS s
+JOIN dbo.DimProduct AS p ON s.ProductKey = p.ProductKey
+JOIN dbo.DimDate AS d ON s.DateKey = d.DateKey
+GROUP BY p.ProductName, d.[Year]
+HAVING SUM(s.SalesAmount) > 10000;
+```
+
+Move that condition into `WHERE` and you are filtering single sales rows, which answers a different question.
+
+**Ranking functions differ only after a tie.** `ROW_NUMBER` numbers every row in sequence. `RANK` gives tied rows the same value and then leaves a gap, as in 1, 2, 2, 4, 5. `DENSE_RANK` returns ranks with no gaps, so the value after a tie is the next integer. If the requirement says the next amount after a tie increments the rank by one, the answer is `DENSE_RANK`.
+
+**Statistics are mostly automatic in a warehouse.** The engine creates and maintains statistics at query time. You can still create, update and drop them yourself with `CREATE STATISTICS`, `UPDATE STATISTICS` and `DROP STATISTICS`. When you do, Microsoft advises focusing on columns heavily used in the query workload, specifically in GROUP BYs, ORDER BYs, filters and JOINs. After a large data change, the documented update looks like this:
+
+```sql
+UPDATE STATISTICS dbo.DimCustomer (DimCustomer_CustomerKey_FullScan) WITH FULLSCAN;
+```
+
+<details>
+<summary><b>Self-check.</b> A query must return one row per category with the latest stock date, counting only rows where stock is under 50. Where does the "under 50" condition go?</summary>
+
+In `WHERE`, because it filters individual rows before grouping: `WHERE stock_quantity < 50 GROUP BY category` with `MAX(last_stocked_date)` in the `SELECT`. `HAVING` would be right only if the condition tested an aggregate, such as a minimum or a total per category.
 </details>
 
 ---

@@ -2,7 +2,7 @@
 
 This page is the map. It covers what the exam is made of, what the questions look like on screen,
 how the clock works, and how to spend the weeks before it. Everything here tracks the current
-edition of the exam, **Skills measured as of July 21, 2026**.
+edition of the exam, **Skills measured as of October 19, 2026**.
 
 The certification is **Microsoft Certified: Fabric Analytics Engineer Associate**. The exam that
 earns it is DP-600, *Implementing Analytics Solutions Using Microsoft Fabric*.
@@ -51,6 +51,10 @@ questions are worth more than one point, and when that is true the question says
 ## What changed in this version
 
 Two changes matter, and the one that matters most is not the recent one.
+
+The October 19, 2026 edition changes no skill. Its only edit is the casing of one sub-bullet, which
+now reads *Visual query editor*. The weights, the skill areas and every other bullet are the same as
+in July, so nothing you study changes.
 
 The July 2026 edition altered five strings. Two of them change what you are asked. *Choose between a
 lakehouse, warehouse, or eventhouse* became **Choose between different data stores** — the objective
@@ -108,7 +112,7 @@ exams have a fixed shape.
 
 **Prepare data is close to half the exam.** That is the single most useful fact on this page for
 planning. It covers getting data in, transforming it, and querying it in four different surfaces:
-the Visual Query Editor, SQL, KQL and DAX.
+the visual query editor, SQL, KQL and DAX.
 
 *Maintain a data analytics solution* is security, governance and the development lifecycle —
 workspace and item access, row-level and column-level and object-level and file-level security,

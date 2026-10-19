@@ -147,7 +147,7 @@ Two rules break the tidy picture, and both are examinable.
 
 **Reshare breaks the Member-only story.** Contributors and Viewers can also share items if they have been granted Reshare permission. So a stem offering "grant Member" and "grant Reshare" is asking whether you know the second exists. Reshare is the smaller change and usually the better answer, because it grants exactly the capability the requirement named and nothing else.
 
-Roles can be assigned to individuals, to security groups, to Microsoft 365 groups and distribution lists, and to service principals, which inherit the same permissions as users for programmatic operations. Group-based assignment is the maintainable answer in any onboarding or offboarding scenario, and it is usually the keyed one. The service principal case matters for the lifecycle objective too: automation that deploys or commits on your behalf needs a role like any other identity.
+Roles can be assigned to individuals, to security groups, and to Microsoft 365 groups and distribution lists, and a role can also be assigned to a Microsoft Entra service principal, the identity that automation runs as. Group-based assignment is the maintainable answer in any onboarding or offboarding scenario, and it is usually the keyed one. The service principal case matters for the lifecycle objective too: automation that deploys or commits on your behalf needs a role like any other identity, and one that can change items: Contributor or higher, never Viewer.
 
 One qualifier on "a Viewer cannot read the data", because you can open two Microsoft pages during the exam and read them as though they disagree. Item Read is not data access — that rule holds and it is the one to answer from. But access through the SQL analytics endpoint additionally depends on the endpoint's mode, and depending on that mode a user may need SQL permissions or the ReadData item permission on top of Read. The workspace capability table reflects that by ticking Viewer for reads over T-SQL, while the OneLake and Spark path stays closed to them. So read the path the stem names. "Cannot open the report's underlying Delta files through OneLake or Spark" is a Viewer. "Cannot run any query against the tables at all" is not a workspace role question, and the answer lives in the endpoint's mode or in SQL permissions.
 
@@ -163,7 +163,7 @@ Two mechanisms label items, and neither changes who can open them. Getting that 
 
 A sensitivity label comes from Microsoft Purview Information Protection and exists to guard content against unauthorised access and leakage. Labels are defined in Purview and applied in Fabric — so "create a new sensitivity label in Fabric" is always wrong. If the label a user needs is greyed out in the menu, Microsoft's explanation is that they may not have permission to use that label, which points at Purview configuration rather than at anything in the workspace.
 
-Sensitivity labels travel. Downstream inheritance means a label applied to a semantic model or report flows to content built from it: for a semantic model, to other semantic models, reports and dashboards; for a report, to dashboards. **It flows downstream only.** Labelling a report does nothing to the model it came from, which is why the model is usually the right place to apply the label. Downstream inheritance sits alongside several other propagation mechanisms — inheritance from data sources, inheritance upon update and relationship changes, inheritance upon creation of new content, and inheritance upon export to file. Any of those makes a plausible wrong answer when the stem is really about downstream inheritance, so read which direction the data is moving.
+Sensitivity labels travel. Downstream inheritance means a label applied to a semantic model or report flows to content built from it: for a semantic model, to other semantic models, reports and dashboards; for a report, to dashboards. **It flows downstream only.** Labelling a report does nothing to the model it came from, which is why the model is usually the right place to apply the label. **Downstream inheritance reaches items that already exist**, when a parent's label is applied or changed. A report built later on a labelled model gets the label through **inheritance upon creation**, which happens even when the downstream inheritance setting is off. Downstream inheritance sits alongside several other propagation mechanisms — inheritance from data sources, inheritance upon update and relationship changes, inheritance upon creation of new content, and inheritance upon export to file. Any of those makes a plausible wrong answer when the stem is really about downstream inheritance, so read which direction the data is moving.
 
 Endorsement is the other mechanism, and it is a recommendation rather than a protection. Endorsed items carry a badge and in some lists are given precedence and listed first. There are three badges, not two, and material written before the third arrived will tell you otherwise.
 
@@ -231,7 +231,7 @@ Two facts decide most pipeline questions.
 
 Rules exist so stages can keep different configurations — a development stage querying sample data while production points at the real database. That is the scenario, almost every time, and it is what makes a pipeline more than a copy button. Without rules, promoting content would carry the development connection into production along with everything else.
 
-**The pipeline's shape is permanent.** The number of stages and their names cannot be changed after the pipeline is created. Only a stage's public status can be changed later. So the answer to "we need a fourth stage" is a new pipeline, not an edit — which makes the initial design decision unusually consequential for something that otherwise looks reconfigurable.
+**The number of stages is permanent.** It cannot be changed after the pipeline is created, while a stage's public status can be changed at any time. So the answer to "we need a fourth stage" is a new pipeline, not an edit — which makes the initial design decision unusually consequential for something that otherwise looks reconfigurable.
 
 Content reaches a stage in one of two ways: you assign a workspace to it, or you deploy into it from the stage before. Assignment is how a pipeline gets its starting content; deployment is how that content moves onward. A stem describing a team that already has a development workspace and wants to add test and production is describing assignment followed by two deployments.
 
@@ -284,6 +284,34 @@ Do not read "Premium, Premium Per User and Power BI Embedded" as ruling out Fabr
 | Template file | Layout, model and queries, no data | Somebody needs a starting point |
 | Data source file | One connection, no credentials, no data | Somebody needs to reach the right source |
 | Shared semantic model | One model, many reports | Several reports need one truth |
+
+---
+
+## Settings that decide whether a change can land
+
+Three settings come up again and again in this objective. Each is easy to confuse with a neighbour that sounds right.
+
+**The XMLA endpoint is read-only until someone changes it.** By default, Premium capacity and Premium Per User semantic model workloads have the XMLA endpoint set to read-only, so applications can only query a semantic model. For a tool to write — deploy metadata, change a model, script it — the XMLA Endpoint property must be enabled for read-write. On a Premium capacity you do that in the capacity's **Workloads** section by selecting **Read Write** in the XMLA Endpoint setting. That setting applies to every workspace and semantic model assigned to the capacity, so it is a capacity decision, not a model one.
+
+The tools follow the setting. Tabular Editor 2.x needs only read-only for query operations, but it needs read-write for metadata operations. So when a stem says an external tool can read a model and cannot deploy changes to it, the answer is the endpoint setting. Large semantic model storage format is the near miss: Microsoft recommends it for anyone planning XMLA write operations, but turning it on does not make the endpoint writable.
+
+**Autobinding is what you get for free in a deployment pipeline.** When an item you deploy depends on an item that already exists in the target stage, deployment pipelines automatically connect the deployed item to it in that stage. A report promoted to Test binds to the semantic model already in Test, with no rule involved. A deployment rule is for a value that has to be different in a stage, such as a smaller data source in Test. If the dependency is missing from the target stage and is not part of the deployment, the deployment fails. **Select related** adds the dependent items so it does not.
+
+| You need | Use |
+|---|---|
+| A deployed report to use the model already in the next stage | Nothing — autobinding does it |
+| Test to read a different database or parameter value | A deployment rule in the Test stage |
+| A first deployment of a report whose model is not there yet | Select related |
+
+**Sharing a lakehouse is narrower than any workspace role.** A workspace role reaches every item in the workspace. Sharing the lakehouse item instead always includes **Read**, and you add only the access path the person needs. **Read all with SQL analytics endpoint** lets them read the data with T-SQL through the SQL analytics endpoint. **Read all with Apache Spark** is a separate, additional permission for Spark and OneLake API access. A user with only the SQL permission can query through the SQL analytics endpoint URL but cannot reach the data through the lakehouse URL. That is exactly what a least-privilege stem that says "SQL only, no Spark, nothing else in the workspace" is asking for.
+
+> **Currency note.** Older material, including Microsoft's own practice questions, calls the SQL permission "Read all SQL endpoint data". The sharing dialog now names it Read all with SQL analytics endpoint.
+
+<details>
+<summary><b>Self-check.</b> An analyst must query one lakehouse with T-SQL from SQL Server Management Studio, must not see the workspace's other items and must not use Spark. What do you grant?</summary>
+
+Share the lakehouse item with them and select Read all with SQL analytics endpoint. Any workspace role, even Viewer, opens the other items, and Read all with Apache Spark would add the Spark access they must not have.
+</details>
 
 ---
 

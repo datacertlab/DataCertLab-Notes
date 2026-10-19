@@ -32,7 +32,7 @@ A table's storage mode depends on its data source, and it controls whether Power
 | DirectQuery | Left at the source | Live at query time |
 | Dual | Both, chosen per query | Depends which is used |
 | Hybrid | Import plus a live partition | Historical plus live |
-| On a semantic model | Queries the source model | As the source model |
+| DirectQuery on Power BI semantic models | Queries the source model | As the source model |
 
 Import stores a compressed snapshot in native storage for quick loading, and getting newer data means refreshing the model or table. DirectQuery keeps nothing in the model and queries the source as visuals load, translating the query into the source's native language — which is why DirectQuery performance is really source performance.
 
@@ -59,7 +59,7 @@ Two rules about the choice itself.
 
 One more term to recognise without confusing it for a storage mode. A live connection report has no local semantic model and is sometimes called a thin report; the remote model it connects to can use any table storage mode, and measures the report author creates are stored in the report rather than in the model. The distinction matters because a thin report is often the right answer when the requirement is "reuse the sanctioned model without forking it" — and it is not a composite model, because nothing is being extended.
 
-> **Currency note.** Two current Microsoft pages disagree here. The optimization guidance names three modes — Import, DirectQuery and Composite — while the storage mode reference names seven and treats composite as a property of a model rather than a table mode. The exam answer follows the reference page. Answer storage mode questions from the seven-mode list, and treat "there are three storage modes" as the stale statement it is.
+> **Currency note.** Microsoft describes storage at two levels. The optimization guidance names three kinds of semantic model — Import, DirectQuery and Composite. The storage mode reference names the seven modes a table can take and defines a composite model as one whose tables use more than one mode, so Composite is never a mode you set on a table. Answer a question about a table's storage mode from the seven-mode list.
 
 <details>
 <summary><b>Self-check.</b> A model was built in Import mode a year ago. The data has grown past what the capacity can hold. Can you switch the tables to Direct Lake?</summary>
@@ -88,12 +88,12 @@ Microsoft calls the Direct Lake operation **framing** — the storage mode artic
 
 By default Direct Lake on OneLake loads the latest data. To take manual control you turn off automatic sync in the scheduled refresh settings and refresh by hand.
 
-Now the part the exam actually asks about. **Direct Lake on SQL falls back to DirectQuery in three stated cases:** when a view is used, when granular SQL access is enabled, and when a Direct Lake guardrail is reached. Those are the three cases Microsoft documents, and they are the substance of choosing between the two flavours. Learn them as the documented set rather than inventing a fourth: an option naming one of the three is defensible, and one naming a condition Microsoft does not list is not.
+Now the part the exam actually asks about. **Direct Lake on SQL can fall back to DirectQuery; Direct Lake on OneLake cannot.** The storage mode reference names three common causes: a view is used, granular SQL access is enabled, or a Direct Lake guardrail is reached. Microsoft's fuller list adds SQL row-level security, dynamic data masking or object-level security defined at the SQL analytics endpoint, and a table that was not framed after its Delta table was created or modified, which is why a refresh can end a fallback. Those causes are the substance of choosing between the two flavours.
 
 | Aspect | Direct Lake on OneLake | Direct Lake on SQL |
 |---|---|---|
 | Created from | The OneLake catalog | A SQL analytics endpoint |
-| Documented fallback | Not listed | Three stated conditions |
+| DirectQuery fallback | Not supported | Views, SQL security, guardrails, unframed tables |
 | Mode changeable later | Yes | No |
 
 Fallback is a performance event, never a security hole. A query that falls back still honours row-level security — the governance domain makes the same point from the other side, where a Direct Lake query against a warehouse deliberately falls back in order to obey a security policy.
@@ -102,12 +102,12 @@ Two more things worth carrying. Direct Lake suits models over large lakehouses a
 
 That upstream shift has a practical consequence worth stating. If the model is Direct Lake, fixing a data problem means fixing it in the lakehouse or warehouse, not in the model. There is no import step in which to quietly correct something, so the discipline the preparation domain teaches about views and transformations stops being optional. Microsoft names Direct Lake as an ideal choice for the curated layer of a medallion architecture for exactly this reason: the model reads a shape somebody has already finished.
 
-> **Currency note.** The objective's wording changed in July 2026 from "Direct Lake on SQL endpoints" to "Direct Lake on SQL analytics endpoint". The exam answer is unchanged, because the behaviour and the three fallback conditions are the same. Expect the current singular wording in the stem.
+> **Currency note.** The objective's wording changed in July 2026 from "Direct Lake on SQL endpoints" to "Direct Lake on SQL analytics endpoint". The exam answer is unchanged, because the behaviour and the fallback conditions are the same. Expect the current singular wording in the stem.
 
 <details>
 <summary><b>Self-check.</b> A Direct Lake model was fast last month and is slow now. Nothing about the data volume changed, but a developer added a view. What happened?</summary>
 
-If it is Direct Lake on SQL, adding a view is one of the three documented conditions that make queries fall back to DirectQuery mode. Nothing is broken and no security was bypassed — the model is simply federating queries to the source instead of scanning Delta files in memory. The fix is to remove the dependency on the view, or to accept the fallback knowingly.
+If it is Direct Lake on SQL, adding a view is one of the documented conditions that make queries fall back to DirectQuery mode. Nothing is broken and no security was bypassed — the model is simply federating queries to the source instead of scanning Delta files in memory. The fix is to remove the dependency on the view, or to accept the fallback knowingly.
 </details>
 
 ---
@@ -122,7 +122,7 @@ Three rules do most of the work.
 
 **Relationships do not enforce data integrity.** Microsoft says so in an explicit callout. Anyone reasoning from foreign keys expects otherwise, which makes "add a relationship" a convincing wrong answer to a data quality problem. Orphaned keys are fixed upstream, in the preparation domain's territory.
 
-**Multiple filters on a table combine with `AND`.** All conditions must be true. That single semantic explains most "why is this visual empty" questions.
+**Separate filters on a table combine with `AND`.** All conditions must be true. That single semantic explains most "why is this visual empty" questions. One filter can still admit several values, as a multi-select slicer does; it is the separate filters that must all hold.
 
 **Filter the dimension, let it reach the fact.** Microsoft recommends star schema design principles and describes the common setup as rules that filter dimension tables, with relationships propagating those filters efficiently to fact tables. Direction of travel is the whole design.
 
@@ -224,7 +224,7 @@ Objective 3.1 names specific functions, so it is worth knowing what each one is 
 
 A variable's own expression may declare another variable inside it, so nesting is legal when a calculation genuinely has two stages.
 
-**`CALCULATE` evaluates an expression in a modified filter context**, and `CALCULATETABLE` does the same job for an expression that returns a table. The filters you pass it can take three forms — a Boolean filter expression, a table filter expression, or a filter modification function — and where you pass more than one, they are evaluated with the logical `AND` operator. All the conditions must be met, which is the same rule two slicers on a page follow.
+**`CALCULATE` evaluates an expression in a modified filter context**, and `CALCULATETABLE` does the same job for an expression that returns a table. The filters you pass it can take three forms — a Boolean filter expression, a table filter expression, or a filter modification function — and separate filter arguments must all be met, which is how the `CALCULATETABLE` reference states it and the same rule two slicers on a page follow. Within a single filter you choose the logic yourself: `&&` when both conditions must hold, `||` when either may.
 
 **`SUMX` is an iterator.** It returns the sum of an expression evaluated for each row in a table, which is what makes it the answer when the thing you need to add up does not exist as a column. Its first argument is a table, or an expression returning one; its second is a column of numbers, or an expression that evaluates to one. `SUM` adds a column that is already there; `SUMX` computes a value per row and then adds those.
 
@@ -314,6 +314,46 @@ Two model-shape decisions from earlier in this domain are also performance decis
 <summary><b>Self-check.</b> Reports on a Premium Per User workspace are slow and the team wants to find the offending visual. What do you tell them?</summary>
 
 Performance Analyzer is not available for Premium Per User activities or capacity, so the usual first move is closed off. Diagnosis has to come from elsewhere — the capacity metrics available for that workspace, or reproducing the model in an environment where the analyzer does run. The point of the question is recognising the stated limitation rather than reaching for the familiar tool.
+</details>
+
+---
+
+## Faster from the files up: V-Order, maintenance and DAX rewrites
+
+A Direct Lake model reads Delta files, so how those files are written is part of the model's performance. **V-Order is disabled by default for all newly created workspaces.** Microsoft made that choice to favour write-heavy data engineering. V-Order is a write-time optimization of the Parquet layout for faster reads, which is exactly what dashboards over Direct Lake need. For read-heavy work you enable it by setting `spark.sql.parquet.vorder.default` to `true`, or by switching to a read-heavy resource profile that enables it automatically. An option that says V-Order is already applied to every table is out of date.
+
+The lakehouse table **Maintenance** action does the same from Lakehouse explorer, without writing code. It runs two separate jobs:
+
+| Action | What it does | What it fixes |
+|---|---|---|
+| `OPTIMIZE` (optionally with Apply V-order) | Compacts small Parquet files into larger ones | Slow reads over many small files |
+| `VACUUM` | Removes unreferenced files older than the retention threshold | Storage taken by old files |
+
+`VACUUM`'s default retention threshold is seven days, and Fabric portal and API maintenance requests fail by default for intervals under seven days. So a table that must keep seven days of history is served by the default. A table that is both slow and too large needs both actions, each for its own reason.
+
+On the DAX side, three rewrites come up repeatedly.
+
+**Pass Boolean filters to `CALCULATE`.** Microsoft recommends Boolean filter expressions over `FILTER` table expressions whenever possible, because Import tables are in-memory column stores optimized to filter columns. `CALCULATE([Sales], 'Calendar'[Year] = 2023)` beats wrapping a whole table in `FILTER`. The exception is a condition that evaluates a measure. A measure cannot appear in a Boolean filter argument, so `FILTER` is still required there.
+
+**Evaluate once, branch with `SWITCH`.** `SWITCH` evaluates an expression against a list of values and returns one of several results, which removes nested `IF` statements. Combine it with a variable so the measure is evaluated once:
+
+```dax
+Variance KPI =
+VAR Calc = [Variance]
+RETURN
+    SWITCH ( TRUE (), Calc > 0.80, "Amazing!", Calc > 0.60, "Good", "Bad" )
+```
+
+In Microsoft's own variable example, the rewritten measure produced the same result in about half the query time.
+
+**Filter an unrelated table with `TREATAS`.** `TREATAS` applies the result of a table expression as filters to columns of an unrelated table, so it is the tool when no relationship exists. `USERELATIONSHIP` is different: it activates a relationship that is already in the model but inactive.
+
+For DirectQuery reports, the fix for too many queries is in the report, not the model. The Optimize ribbon's **Query reduction** preset turns off cross-highlighting and cross-filtering and adds an Apply button to the filter pane, and it is the preset meant for DirectQuery. Apply all slicers and Clear all slicers buttons do the same for a page full of slicers, cutting the unnecessary queries the slicers send. **Pause visuals** is easy to confuse with these. It stops DAX queries while you edit the report in Desktop, and it pauses the whole report, so it helps the author but does nothing for the people using the report.
+
+<details>
+<summary><b>Self-check.</b> A Direct Lake model over a lakehouse written by notebooks is slow, the tables hold thousands of small files, and storage keeps growing. What do you run?</summary>
+
+`OPTIMIZE` with Apply V-order, for the small files and the read layout, and `VACUUM`, for the storage. `VACUUM` on its own reduces storage but changes nothing the next query scans, and the workspace will not have applied V-Order by default.
 </details>
 
 ---
