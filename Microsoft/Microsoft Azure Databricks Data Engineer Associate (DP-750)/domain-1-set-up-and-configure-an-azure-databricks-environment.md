@@ -52,7 +52,9 @@ termination are all settings you choose. You pay for that control with the work 
 For Databricks SQL there are exactly three warehouse types: serverless, pro and classic. An option
 naming a fourth is wrong on its face. Serverless SQL warehouses start fast — typically between two
 and six seconds — which is the figure that makes "fastest startup" decidable rather than a matter
-of impression.
+of impression. Pro and classic warehouses take several minutes, typically about four, and scale less
+responsively. So a dashboard that fails while its warehouse wakes up, or demand that comes in bursts,
+points at serverless.
 
 | Warehouse type | Reach for it when |
 |---|---|
@@ -68,6 +70,21 @@ distinction is lifecycle, not frequency. A useful second fact comes with it: a j
 existing all-purpose compute that has been terminated causes that compute to **autostart**, so the
 run does not simply fail.
 
+Serverless compute for jobs is where Databricks wants your job tasks. It recommends serverless for
+every job task, turns on autoscaling and Photon for you, and picks instance types, memory and engine
+itself. It runs notebook, Python script, dbt, Python wheel and JAR tasks. You choose compute per
+task, so one job can run some tasks on serverless and others on classic jobs compute.
+
+Three requirements send a task to classic jobs compute instead:
+
+- code written against Spark RDD APIs, because serverless runs only Spark Connect APIs;
+- a compute-scoped library or a Maven package, which serverless does not install;
+- a specific VM instance type, because serverless chooses instance types for you.
+
+Note the scope of the JAR rule. A JAR task runs on serverless jobs compute; a JAR library installed
+into a notebook does not. Serverless also has no Spark UI; you troubleshoot it with the query profile
+instead, so a requirement to inspect the Spark UI is another classic-compute requirement.
+
 One naming point the guide creates by itself. Its compute list reads "job compute, serverless,
 warehouse, classic compute, and **shared compute**" — and shared compute is not a fifth type
 alongside the others. It is an access mode: standard access mode, which the documentation still
@@ -79,7 +96,7 @@ the limitations.
 ```mermaid
 flowchart TD
     A["Start: every option"] --> B["Pinned runtime version<br/>rules out serverless"]
-    B --> C["RDD, R or JAR<br/>rules out standard mode"]
+    B --> C["RDD or R code<br/>rules out standard<br/>and serverless"]
     C --> D["SQL-only workload<br/>points to a warehouse"]
     D --> E["Nothing ruled it out:<br/>serverless"]
 ```
@@ -90,6 +107,7 @@ flowchart TD
 | A named runtime version | Classic | Serverless is versionless |
 | Fastest query start | Serverless SQL warehouse | Typically two to six seconds |
 | Lowest effort, supported workload | Serverless | Recommended over pools |
+| A specific VM instance type | Classic jobs compute | Serverless picks instance types |
 
 Where a workload supports serverless, Databricks recommends serverless rather than instance pools.
 Note the shape of that sentence: it is a recommendation conditional on serverless support, not a
@@ -137,14 +155,19 @@ resolution rule, not a mode** — something you choose moves it, and you did not
 The runtime figure is the current documented boundary and is the part most likely to move; the
 three triggers, and the fact that any of them lands you in dedicated mode, are the stable half.
 
-> **Trap.** Both limitations belong to the *access mode*, not to serverless compute. A great deal
-> of study material lists them under "serverless limitations", because the two topics travel
-> together in summaries. If a stem names a workload needing RDD APIs, it is asking about access
-> mode unless it also names a compute type. A candidate who has fused the two will eliminate
-> serverless on a question that never mentioned it.
+> **Trap.** RDD APIs and R are missing from *both* standard access mode and serverless compute.
+> Serverless runs only Spark Connect APIs, so it has no RDD support and no R. Spark-submit tasks,
+> the machine learning runtime and GPU compute are different: they are standard-mode limits that
+> dedicated access mode on classic compute removes. So a workload written against RDDs, or in R,
+> lands on classic compute in dedicated access mode, and neither "switch to serverless" nor "keep
+> standard" survives.
 
-The portable rule: when you read a limitation, ask which noun it attaches to before you ask what it
-rules out.
+Dedicated does not mean one person. Dedicated access mode assigns the compute to a single user *or
+group*, and only that user or group can attach to it, so a whole R team can still share one
+resource.
+
+The portable rule: when you read a limitation, ask which compute and which access mode it attaches
+to before you ask what it rules out.
 
 <details>
 <summary><b>Self-check — access modes</b></summary>
@@ -190,6 +213,12 @@ because of the overhead of shuffling data between them. Total executor memory �
 access memory (RAM) across all executors — determines how much data is held in memory before
 spilling to disk, and that is usually the figure that matters for a transformation that is
 struggling.
+
+For a complex extract, transform and load (ETL) job that joins and unions several tables, Databricks recommends *fewer* workers to
+reduce the data shuffled between them, with larger instances to make up the capacity. If you see
+significant spill to disk or out-of-memory errors, give each instance more memory. Put together,
+eight small workers that spill during joins become two large, memory-heavy workers with the same
+total cores: less shuffle traffic and more memory per core, at no extra core cost.
 
 The objective lists the performance settings by name, and they are worth reading as a set rather
 than as options: central processing unit (CPU) and node count, autoscaling, termination, node type,
@@ -250,11 +279,15 @@ what a large join is already dominated by.
 **Photon** is the vectorised query engine. Two facts about it answer most questions. It is the
 default engine for all SQL warehouses, so an option telling you to enable it there is wrong. And it
 requires no change to code or queries — it also covers the DataFrame application programming
-interface (API) across Python, R, Scala and Java, not SQL alone.
+interface (API) across Python, R, Scala and Java, not SQL alone. It pays off most on SQL and
+DataFrame work with complex transformations — joins, aggregations and scans of large tables. A
+simple batch job without wide transformations may see little change.
 
 **Databricks Runtime** versions are chosen when you configure classic compute. A version marked for long-term support (LTS)
 is under that support, which is the property a requirement leans on when it says a workload
-must stay on a supported version. Databricks Runtime for machine learning is a separate set of
+must stay on a supported version. Databricks recommends the latest LTS version, because LTS
+versions receive extended security patches and bug fixes. A workload validated on an LTS version
+stays on it; "the current runtime" is the option that brings in changes nobody tested. Databricks Runtime for machine learning is a separate set of
 runtime versions, each pinned to its own MLflow version — so machine learning is a runtime *choice*
 made at configuration time, not a toggle you flip afterwards. Pair that with the single-node limit
 above: a stem combining machine learning with single node compute has a documented obstacle in GPU
@@ -281,12 +314,39 @@ supported, and installable directly onto compute or a job task.
 Library installation options have a defined precedence order. Know that an order exists; do not
 try to recall the ranking from memory under time pressure unless you have read it recently.
 
+**The allowlist** is the step people miss on standard access mode. From Databricks Runtime 13.3 LTS,
+a Unity Catalog allowlist decides which libraries and init scripts may run on standard access mode
+compute. It is empty by default and cannot be switched off, and changing it needs the `MANAGE
+ALLOWLIST` privilege. Maven packages go on it as coordinates, in `groupId:artifactId:version` form,
+and the person adding them needs `CAN ATTACH TO` and `CAN MANAGE` on the compute. JARs and init scripts
+go on it as volume or storage paths. An allowlisted path is not a data grant: Azure Databricks still
+checks access to the files there.
+
+| You need | On standard access mode |
+|---|---|
+| A Maven package on one compute | Allowlist the coordinates, then install a compute-scoped library |
+| A JAR from a volume | Allowlist the path, then install it |
+| A Python package for one notebook | A notebook-scoped library; no allowlist step |
+
+Serverless compute sits outside this table. It does not install compute-scoped libraries, init
+scripts or Maven coordinates at all; Python dependencies go into a base environment or the
+notebook's own dependencies.
+
 ## Who can do what to a compute resource
 
-Permissions on compute run through a ladder, and the ladder for a **pool** is shorter than the one
-for compute: a pool has three levels — no permissions, can attach to, and can manage. There is no
-restart level on a pool. That asymmetry is small, documented, and a clean way to separate two
-otherwise similar questions.
+Permissions on compute run through a ladder. On compute it has five levels: `NO PERMISSIONS`, CAN
+VIEW (Beta), `CAN ATTACH TO`, `CAN RESTART` and `CAN MANAGE`. Each adds to the one below it.
+
+| Level | Adds |
+|---|---|
+| `CAN ATTACH TO` | Attach notebooks; view metrics and the Spark UI |
+| `CAN RESTART` | Start, restart and terminate the compute |
+| `CAN MANAGE` | Edit details, resize, change permissions |
+
+So "run notebooks without managing the compute" is `CAN ATTACH TO`, and `CAN RESTART` is already an
+over-grant. The ladder for a **pool** is shorter: a pool has three levels — no permissions, can
+attach to, and can manage. There is no restart level on a pool. That asymmetry is small, documented,
+and a clean way to separate two otherwise similar questions.
 
 Two rules explain most permission scenarios. Workspace admins hold the manage permission on every
 object in their workspace. And a user automatically holds it on objects they create — which is why
@@ -298,7 +358,9 @@ permission name, so expect to meet these as symptoms. By default,
 Spark driver logs are viewable only to users with the manage permission on job compute and
 all-purpose compute in dedicated or standard access mode, and the same default applies to compute
 created from a pool. Relaxing that takes an explicit Spark configuration property, not a permission
-change.
+change: set `spark.databricks.acl.needAdminPermissionToViewLogs false` in that compute's Spark
+config, and users with `CAN ATTACH TO` or `CAN RESTART` can read the logs. It is a compute-level
+property, so you set it on each compute that needs it.
 
 ## How Unity Catalog is shaped
 
@@ -459,13 +521,20 @@ governing non-tabular data is the definition. Volumes come in the same two kinds
 volumes use Databricks-managed storage, external volumes add governance over existing cloud object
 storage.
 
+A volume is managed unless you say otherwise. To make it external you associate it with an external
+location, and you can point it at a sub-directory of that location rather than its root. That
+matters because cloud URI access under an external volume's path is governed by the volume's own
+privileges, not the external location's. So "make only the `iot` directory available, in place,
+and keep the files if the object is dropped" is an external volume created at the `iot` path. A
+volume on the parent path exposes everything beneath it, and a managed volume would move the files.
+
 **Materialized views** pre-compute and cache query results to improve performance and reduce cost.
-The exam names the symptom rather than the feature, so recognise the situations: keeping a business
-intelligence dashboard current with minimal end-user query latency, or reducing complex extract,
-transform and load orchestration with simple SQL logic. Both phrasings are Microsoft's, listed as
-common use cases — read them as symptoms a stem will describe, not as a claim that materialized views
-replace orchestration. The user who creates a materialized
-view is its owner, consistent with the general rule.
+The exam names the symptom rather than the feature, so recognise the situations Microsoft lists:
+keeping a business intelligence dashboard current with minimal end-user query latency, building
+complex layered transformations, and any use case that demands consistent performance with
+up-to-date insights. Read them as symptoms a stem will describe. A chain of dependent clean, enrich
+and aggregate steps is the second case, not only the dashboard at its end. The user who creates a
+materialized view is its owner, consistent with the general rule.
 
 Data definition language (DDL) operations behave differently on managed and external tables, and
 the difference traces back to who owns the files — which is the distinction you have already
@@ -522,7 +591,9 @@ What is, in that case, is the Spark Data Source API — used when the source is 
 write access is needed, or when you want more control over query execution and parallelisation.
 Databricks Runtime bundles connectors for common databases including PostgreSQL, SQL Server, MySQL,
 Snowflake and Redshift, and a Java Database Connectivity (JDBC) connection in Unity Catalog can
-supply a driver for any JDBC-compatible database.
+supply a driver for any JDBC-compatible database. That connection is used through the Spark Data
+Source API or the Remote Query SQL API and governs access only at the connection level: foreign
+catalogs are not supported with JDBC connections, so it never gives you a federated catalog.
 
 | | Lakehouse Federation | Spark Data Source API |
 |---|---|---|
@@ -531,6 +602,24 @@ supply a driver for any JDBC-compatible database.
 | Reach for it when | Governed reads, minimal setup | Unsupported source, or writes |
 
 The word "write" in a stem settles this pair on its own.
+
+Order is the other thing a stem tests. A connection holds the path and credentials for the external
+database, and a foreign catalog is created *from* a connection that already exists. Creating the
+foreign catalog needs `CREATE CATALOG` on the metastore and either ownership of the connection or
+`CREATE FOREIGN CATALOG` on it. Databricks recommends secrets rather than plaintext for the
+credentials:
+
+```sql
+CREATE CONNECTION pg_conn TYPE postgresql
+OPTIONS (host 'pg1.contoso.com', port '5432',
+  user secret('kv-scope', 'pg-user'), password secret('kv-scope', 'pg-pwd'));
+
+CREATE FOREIGN CATALOG Sales_pg USING CONNECTION pg_conn
+OPTIONS (database 'sales');
+```
+
+A storage credential or an external location is never the first step here. Those govern cloud
+storage paths, and a database endpoint is reached through a connection.
 
 ## Genie, and why it sits here
 
@@ -559,14 +648,35 @@ One naming point will save you a moment of doubt. Genie Agents were formerly kno
 and the exam objective still uses the older umbrella term "AI/BI Genie". Study material written
 before the rename describes the same surface; only the label moved.
 
+How you teach an Agent is the examinable part, and Databricks states a preference order. Use SQL
+expressions for common business terms such as revenue or active customers. Use example SQL queries
+for complex, multi-part questions. Use text instructions only as a last resort, for guidance that
+neither of the others can express.
+
+Those settings live in the Agent's **knowledge store**, alongside two more that stems lean on:
+
+- **Join relationships** record a join condition and a relationship type — many to one, one to
+  many, or one to one — so Genie writes accurate joins even where Unity Catalog defines no foreign
+  key.
+- **Prompt matching** includes entity matching, which gives Genie the distinct values of a string
+  column. A user who types "California" then gets `WHERE state = 'CA'` instead of a search that
+  returns nothing.
+
+Every knowledge store setting is scoped to the Agent and changes no Unity Catalog metadata, so you
+can teach a join or a value mapping without touching the views. Hiding a column is different: it
+removes the column from Genie's context entirely and is not access control. Entity matching works
+only on string columns, and Genie will not enable it on tables with row filters or column masks.
+
 Genie is under active development and its commercial terms carry dates that will pass. Learn the
 discovery-and-governance framing, which is what the objective tests. Do not memorise pricing or
 availability details.
 
 ## Traps worth carrying into the exam
 
-- **Ask which noun a limitation attaches to.** RDD APIs and Spark-submit restrictions belong to
-  standard access mode, not to serverless compute.
+- **RDD and R rule out two things, not one.** Standard access mode and serverless both lack them,
+  so that code lands on classic compute in dedicated access mode.
+- **A specific VM type is a classic-compute requirement.** Serverless chooses instance types itself
+  and installs no compute-scoped libraries.
 - **A version number rules serverless out.** Versionless means always latest, which fails a pinned
   requirement rather than satisfying it.
 - **A pinned-runtime job lands on classic *job* compute.** Ruling serverless out is the first step,
@@ -588,8 +698,13 @@ availability details.
 - **Unity Catalog sits above the workspace.** Compute belongs to a workspace; catalogs are account
   level, which is what lets them govern several workspaces at once.
 - **Photon is already on for SQL warehouses.** An instruction to enable it there is doing nothing.
-- **A pool has no restart level.** Three levels on a pool, four on compute — the asymmetry is
-  documented and worth a mark.
+- **A pool has no restart level.** Three levels on a pool, five on compute (`CAN VIEW` is in Beta)
+  — the asymmetry is documented and worth a mark.
+- **Running notebooks is `CAN ATTACH TO`.** `CAN RESTART` already adds start, restart and terminate.
+- **Standard access mode needs the allowlist.** A Maven package is allowlisted as coordinates before
+  it is installed; an allowlisted path grants no data access.
+- **Teach Genie in the Agent, not in the views.** Join relationships and entity matching live in
+  the knowledge store and leave Unity Catalog untouched.
 - **Drop behaviour follows ownership.** Dropping a managed table removes the data; dropping an
   external table removes only the registration.
 - **Removed is not yet gone.** A dropped managed table is recoverable with `UNDROP`, and the purge

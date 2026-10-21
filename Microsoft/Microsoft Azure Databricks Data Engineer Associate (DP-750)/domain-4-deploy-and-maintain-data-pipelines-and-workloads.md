@@ -154,8 +154,9 @@ A different task should raise an incident only when the load step failed. It is 
 `At least one failed`, and the load succeeds. What state is it in, and what does the task after it
 see?
 
-`Excluded`, and it is skipped. The task downstream of it evaluating `All succeeded` still runs,
-because an excluded upstream counts as successful.
+`Excluded`, and it is skipped. What the task after it sees depends on its other dependencies. If it
+also depends on a task that ran, the excluded upstream counts as successful and `All succeeded` is
+met. If the incident task is its only dependency, it is excluded too.
 </details>
 
 ## What a job is made of
@@ -171,6 +172,45 @@ One detail bridges this objective to the next. A job can be viewed as `YAML` fro
 switching to the code version. That is the same definition a bundle deploys — the interface and the
 packaged project are two views of one thing, which is worth seeing once before bundles arrive.
 
+Each step of a workflow has a task type of its own, so a pipeline of steps is rarely one notebook. A
+**notebook task** runs a notebook, a **pipeline task** runs an existing Lakeflow pipeline, and a
+**Python script task** runs a Python file; dependencies between the tasks put them in order. A
+notebook, then a pipeline, then a script is three tasks and two dependencies, not a notebook that
+calls the others.
+
+A step that fails now and then gets a **retry policy** of its own, added under Retries on the task:
+it decides when and how many times that task's failed runs are retried, so only that task repeats.
+For most configurations nothing is retried until you add one.
+
+Values that change from run to run belong in parameters, not in code.
+
+| Mechanism | What it does |
+|---|---|
+| Job parameter | A key-value pair with a static or dynamic default, overridden when a run is triggered |
+| `{{job.trigger.time.iso_date}}` | The date the run was triggered, in Coordinated Universal Time (UTC) |
+| Python script task parameters | A JSON array of command-line arguments for that task only |
+| Pipeline task parameters | Key-value overrides passed to the pipeline it runs |
+
+Job parameters are pushed down automatically to tasks that take key-value parameters. A Python
+script task takes a JSON array instead, so a job parameter reaches it only when you reference it as
+`{{job.parameters.max_errors}}`, and a value written into its array affects that task alone.
+
+```json
+{
+  "parameters": [
+    {"name": "run_date", "default": "{{job.trigger.time.iso_date}}"}
+  ],
+  "tasks": [
+    {"task_key": "export",
+     "spark_python_task": {"python_file": "Export.py",
+                           "parameters": ["--max-errors", "10"]}}
+  ]
+}
+```
+
+`{{job.run_id}}` is an identifier, not a date, which makes it the commonest wrong default for a
+run-date parameter.
+
 ## Triggers, schedules and being told
 
 Trigger controls live in the job details pane, and they appear **only** for jobs that already have a
@@ -181,6 +221,22 @@ reversible operation.
 > **Trap.** If a run is active when a continuous trigger is resumed, the scheduler waits for that
 > run to complete before triggering a new one. An option claiming that resuming produces a
 > concurrent run is wrong.
+
+Three trigger types cover most stems.
+
+| Trigger | Use it when |
+|---|---|
+| Scheduled | The run belongs at a time; *Simple* sets an interval, *Advanced* sets the period, start time and time zone |
+| File arrival | Files arrive irregularly in a Unity Catalog external location or volume |
+| Continuous | The job should always be running |
+
+A file arrival trigger checks for new files about every minute, on a best-effort basis, and costs
+nothing beyond the cloud provider's charge for listing the files. That makes it the answer to a
+schedule that mostly wakes up to find nothing.
+
+Time zone is the trap in the advanced schedule. A zone that observes daylight saving time can skip or
+delay a run when the clocks change, so a run that must stay at an absolute time - 10:15 UTC, every
+weekday, all year - uses UTC.
 
 Notifications fire on seven events, and a job or task can be configured for any of them.
 
@@ -202,7 +258,7 @@ Alerting then has three constraints that are each easy to assume away.
 | Constraint | What it means |
 |---|---|
 | Three system destinations | Per job or task, per notification event type |
-| No email on maintenance events | Use a system destination instead |
+| Mute until the last retry | A task-notification option that holds alerts until the final retry |
 | Duration limit must be set | No limit, no slow-job notification |
 
 Two behaviours matter more than any of them, because both make a correctly configured alert go
@@ -275,8 +331,10 @@ no run is currently active. A distractor can swap them.
 **And there is no single retry default to memorise.** The default for task retries *depends on the
 job configuration*, and for most configurations the default is to retry nothing at all on task
 failure. Two configurations differ: serverless jobs auto-optimise retries by default, and continuous
-jobs use an exponential backoff policy. So a scenario in which a failed task simply failed, with no
-retry, is not describing a misconfiguration — it is describing the common default. If you want
+jobs use an exponential backoff policy. The notifications page, discussing muted alerts, says tasks
+are retried three times by default; the task configuration page is the one that governs retry
+behaviour, so read what each task is configured to do rather than trusting either figure. A
+scenario in which a failed task simply failed, with no retry, is not describing a misconfiguration — it is describing the common default. If you want
 retries, you add a retry policy.
 
 One interaction is worth carrying because it changes a worst-case calculation: where a task has both
@@ -318,6 +376,15 @@ workspace, supporting the common operations: cloning, branching, committing and 
 resolution on top of that — ordinary Git practice, applied to notebooks and project files rather
 than to application code.
 
+One rule decides most Git questions: **one Git folder per person.**
+Each team member has their own
+Git folder mapped to the remote repository and works on their own branch, and only one user runs Git
+operations on a folder - in a shared folder, one engineer switching branches switches it for
+everyone. Work then leaves through the Git provider: push the branch, open a pull request, and let
+the merge update the deployment branch, from which automation can update production Git folders.
+Committing straight to a protected main, or merging inside a shared folder, skips the review the
+objective is about.
+
 Testing is the other half, and the guide names four kinds: unit, integration, end-to-end, and user
 acceptance testing. They differ in what they hold constant.
 
@@ -338,6 +405,11 @@ its own benefits and challenges — which is a fair description of the situation
 prescribed layout. The portable point for the exam is the ladder itself: a stem describing a fault
 that only appears when two components meet is describing an integration gap, not a unit-test gap.
 
+On the Azure Databricks side, the continuous integration and delivery flow puts the rungs in order. Code and its unit tests are
+written first, a bundle deploys the change, and automated tests then validate what was deployed.
+Unit tests check self-contained functions early and often; they cannot prove the deployed workflow
+works, which is what the later rungs are for.
+
 The lifecycle these pieces form is worth stating once. The objective's bullets are its steps, not a
 list of features. Code lives in a Git folder and moves through branches. A pull
 request is where review happens, and conflict resolution is the ordinary cost of more than one
@@ -353,8 +425,8 @@ by hand, is describing the absence of this lifecycle. It is not a configuration 
 
 > **A note on names.** Both the guide and the documentation now call these **Declarative
 > Automation Bundles**. The documentation records the change directly — *formerly known as
-> Databricks Asset Bundles* — and the objective adopted the new name with the October 19, 2026
-> skills update. Older training material still says **Databricks Asset Bundles**, so recognise
+> Databricks Asset Bundles* — and objective 4.3 adopted the new name in the October 19, 2026
+> edition, where the guide's change log marks that objective as a minor change. Older training material still says **Databricks Asset Bundles**, so recognise
 > both names; the concepts are unchanged either way.
 
 A bundle brings software engineering practice — source control, code review, testing, continuous
@@ -387,8 +459,50 @@ interface (CLI) to be installed — the objective names CLI and REST deployment 
 workspace path is a third option. And remote workspaces need workspace files enabled, which is the
 default on Databricks Runtime 11.3 with long-term support (LTS) and above.
 
+**An existing job joins a bundle by generation, not by copying.** `databricks bundle generate` writes
+the configuration for an existing job, pipeline or dashboard, and `databricks bundle deployment bind`
+binds that resource to the one in the workspace. Binding matters because a deployment tracks the
+resources it creates by ID, not by name: a copied, unbound definition deploys as a second job. The
+job's YAML view is for reading it as code.
+
 **Deployment modes are optional.** A bundle deploys without setting a mode or configuring presets;
 modes apply a group of commonly used settings at once.
+
+**Custom variables** keep one definition across targets. Declare a variable once in the `variables`
+mapping, reference it as `${var.cluster_id}`, and give each target its own value:
+
+```yaml
+variables:
+  cluster_id:
+    description: Cluster that runs the load
+resources:
+  jobs:
+    job1:
+      tasks:
+        - task_key: load
+          existing_cluster_id: ${var.cluster_id}
+targets:
+  dev:
+    variables:
+      cluster_id: 0101-120000-dev001
+  prod:
+    variables:
+      cluster_id: 0101-120000-prd001
+```
+
+From the command line, three commands do three different jobs, and a continuous integration
+pipeline usually runs them in this order:
+
+```bash
+databricks bundle validate
+databricks bundle plan -t production
+databricks bundle deploy -t production --auto-approve
+```
+
+`validate` checks that the configuration files are syntactically correct. `plan` shows the actions a
+deployment would take without changing anything. `deploy` sends the bundle to the target named with
+`-t`, or to the default target when none is named, and `--auto-approve` skips the interactive
+approvals that an unattended run cannot answer.
 
 | | Development mode | Production mode |
 |---|---|---|
@@ -459,6 +573,19 @@ The practical rule: before proposing a manual broadcast hint or a repartition, a
 query qualifies for adaptive execution. If it does, the platform is already doing it, and the real
 answer lies elsewhere.
 
+When the plan still keeps a sort merge join and one side is small enough to fit in memory, the
+`BROADCAST` hint broadcasts that side regardless of the size threshold, so the large side is never
+shuffled:
+
+```sql
+SELECT /*+ BROADCAST(c) */ s.order_id, c.country_name
+FROM Catalog1.Schema1.Sales AS s
+JOIN Catalog1.Schema1.Countries AS c ON s.country_id = c.country_id;
+```
+
+Salting keys and adding shuffle partitions are fixes for skew, not for a small table that should
+never have been shuffled.
+
 Job run history is the other surface. The runs list carries filters, a graph of recently finished
 runs, and the top five errors — which is where a troubleshooting scenario actually starts.
 
@@ -492,6 +619,14 @@ Read those columns rather than reaching for more workers. A memory-bound job giv
 more shuffle; a shuffle-heavy job given more workers gets more of the thing that is already hurting
 it. The sizing reasoning from domain 1 applies unchanged, and so does its warning that total executor
 memory, not worker count, is what decides when data spills.
+
+One bottleneck sits outside that table, because it is not on the workers at all. An **overloaded
+driver** shows up as long gaps between Spark jobs, a busy driver in the cluster metrics and idle
+workers. The most common cause is too many concurrent streams, queries or threaded jobs on one
+cluster - several Auto Loader streams sharing a small driver is the textbook case. The first fix
+Databricks recommends is a larger driver, starting by doubling its size; running fewer streams, or
+spreading them over more clusters, also works. More workers do nothing, because the workers are
+already waiting.
 
 **Cluster restart** is the last item in that bullet and it is a different kind of remedy. It fixes
 the *compute*, not the code: a resource that has accumulated state, is holding cached data you no
@@ -530,18 +665,33 @@ The three travel together and are not the same problem. Shuffle is movement, spi
 shortfall, skew is a distribution. A stem describing a few tasks running far longer than the rest is
 skew; one describing disk activity during a join is spill.
 
+The Spark UI puts a number on that. On the stage page, compare the **Max** task duration in Summary
+Metrics with the **75th percentile**: a Max 50% or more above it suggests skew, while a healthy stage
+shows the two close together. With no spill on the page, a long tail is a distribution problem, not a
+memory one.
+
+```text
+Min 20 s | 25th 40 s | Median 45 s | 75th 50 s | Max 90 s | Spill 0 B
+```
+
+That stage is skewed: its Max is 80% above the 75th percentile.
+
 ### Sending logs to Azure
 
 The objective names two Azure services explicitly, and they do different jobs.
 
-**Compute log delivery** is the streaming mechanism. When all-purpose or jobs compute is created you
-can specify a location for cluster logs — the Spark driver, the worker nodes, and events. Logs are
+**Compute log delivery** is the cluster-side mechanism. When all-purpose or jobs compute is created
+you can specify a location for cluster logs — the Spark driver, the worker nodes, and events. Logs are
 delivered every five minutes and archived hourly in the destination you chose, and delivery
 continues until the compute resource is terminated. Those two intervals, and that termination
-boundary, are the examinable details.
+boundary, are the examinable details. The destination is a Unity Catalog volume path, which is
+recommended, or a legacy DBFS path, and never a Log Analytics workspace.
 
-**Log Analytics workspaces** collect log and trace data, which is analysed with Kusto Query
-Language. That is the Azure-side destination the objective means by log streaming, and **Azure
+**Diagnostic settings** are the route into Azure. On the Azure Databricks resource in the Azure
+portal, the Diagnostic settings tab archives the workspace's diagnostic logs to a storage account,
+streams them to an event hub, or sends them to **Log Analytics**, for the services you choose. Log
+Analytics workspaces collect log and trace data, which is analysed with Kusto Query Language. That
+is the Azure-side destination the objective means by log streaming, and **Azure
 Monitor** is the service it sits inside.
 
 **An Azure Monitor alert is not a job notification, and the objective names them in two different
@@ -551,15 +701,15 @@ it combines the resources to monitor, the signal or data from them, and the cond
 fire. A **log search alert rule** watches everything sending data into a Log Analytics workspace,
 across subscriptions and regions.
 
-That ordering is the examinable part. Compute log delivery and diagnostic settings put the data
-there; the alert rule is a separate object that watches it. Finishing the streaming does not create
+That ordering is the examinable part. Diagnostic settings put the data there; the alert rule is a separate object that watches it. Finishing the streaming does not create
 an alert, and no permission on the job creates one either. So a stem asking to be told when cluster
 logs show a particular pattern is an alert-rule question, and every option about `CAN MANAGE`,
 notification recipients or **Select Success** is answering the other bullet.
 
 > **Trap.** Azure Monitor diagnostic settings do **not** log every Azure Databricks service, and
-> services unavailable there are labelled as such in the documentation. Where a service is missing,
-> the audit log system table is what reaches those events — and the workspace-level and
+> services unavailable there are labelled as such in the documentation - groups events and cluster
+> policy events among them. For those services, the audit log system table is what reaches the
+> events. It holds the audit events listed for it, not a copy of every service log — and the workspace-level and
 > account-level designations apply only to that system table, so account-level activity is not on the
 > Azure side at all. This is the same divergence domain 2 met from the governance side, and it matters
 > just as much here: a requirement for complete coverage is not satisfied by the Azure-side surface
@@ -596,6 +746,20 @@ maintaining themselves.
 retention threshold. The governance reading of that threshold belongs to domain 2; what matters
 here is that storage cost and recoverability are the two ends of the same setting.
 
+Deletes add a step in between. With deletion vectors, deleted rows are only marked as removed and
+stay in the data files until those files are rewritten. `REORG TABLE ... APPLY (PURGE)` rewrites only
+the files that hold such soft-deleted data, and `VACUUM` then removes the files nothing references
+any more.
+
+With predictive optimization off, the nightly maintenance is three statements, in this
+order:
+
+```sql
+OPTIMIZE Catalog1.Schema1.Table1;
+REORG TABLE Catalog1.Schema1.Table1 APPLY (PURGE);
+VACUUM Catalog1.Schema1.Table1 RETAIN 168 HOURS;
+```
+
 Cluster consumption is the third lever, and it reaches back to domain 1: auto termination for idle
 compute, autoscaling bounds sized to the workload, and node types matched to whether the work is
 memory-bound or processor-bound.
@@ -629,8 +793,8 @@ processor-intensive compute. Daily is the documented starting point, adjusted fr
 - **A repair can duplicate data.** Tasks are not idempotent, so a partial write gets rewritten.
 - **Job-level failure notifications go quiet during retries.** Task notifications are the answer.
 - **"Succeeded with failures" is a success.** Select Success to be told about it.
-- **An Azure Monitor alert is not a job notification.** Log delivery puts data in Log Analytics;
-  an alert rule watches it. `CAN MANAGE` on the job does not create that rule.
+- **An Azure Monitor alert is not a job notification.** Diagnostic settings put data in Log
+  Analytics; an alert rule watches it. `CAN MANAGE` on the job does not create that rule.
 - **There is no bundle-deploy REST endpoint.** The CLI deploys the bundle; REST reaches the same
   jobs and pipelines through their own resource APIs.
 - **Development mode pauses schedules and triggers by default** — and it is a default, not a rule:
@@ -650,3 +814,11 @@ processor-intensive compute. Daily is the documented starting point, adjusted fr
 - **Deployment modes are optional.** They are convenience, not ceremony.
 - **Adaptive query execution may have fixed the skew already.** Check before tuning.
 - **`OPTIMIZE` is idempotent.** Running it more often is pure cost.
+- **One Git folder per engineer.** In a shared folder one person switches everyone's branch.
+- **`validate`, `plan`, `deploy`.** Syntax, preview, change - and `--auto-approve` for unattended runs.
+- **File arrival beats a frequent schedule** for files that arrive irregularly.
+- **UTC for absolute times.** Daylight saving zones shift scheduled runs.
+- **A Python script task takes arguments, not pushed-down job parameters.** Reference
+  `{{job.parameters.max_errors}}` explicitly.
+- **Idle workers and a busy driver mean a bigger driver.** Not more workers.
+- **Max far above the 75th percentile is skew.** No spill confirms it.

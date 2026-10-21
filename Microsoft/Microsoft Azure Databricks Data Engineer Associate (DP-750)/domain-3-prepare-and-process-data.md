@@ -41,6 +41,25 @@ The third is the one candidates under-use, and the separator between it and incr
 cannot see a row that has gone; a change feed carries the deletion as an event. A requirement to
 keep the target in step with upstream deletions is a change-based requirement, whatever the volume.
 
+Change data capture is worth defining exactly, because a stem usually describes it without the name.
+It captures inserts, updates and deletes in the source and produces a feed of only the modified
+records, and each row typically carries the operation and a column that orders the feed, so records
+that arrive out of order can be put back in sequence. A source that "exposes transaction log records
+with a sequence number" is offering exactly that.
+
+The incremental route has a managed form too. A Lakeflow Connect **query-based connector** queries the
+source database directly, with no CDC configuration, and finds new or updated rows through a **cursor
+column** — a monotonically increasing timestamp or integer column such as `updated_at`. It needs no
+ingestion gateway and no staging volume, and it runs on a schedule you define rather than
+continuously. The price is paid by the source: querying its tables directly can be slower and puts
+more load on the database than a CDC connector reading the change log, and tracking deletes needs
+extra configuration.
+
+| Requirement in the stem | Points at |
+|---|---|
+| No CDC on the source, no gateway allowed, an `updated_at` column | Query-based connector, cursor column |
+| Deletes and their order preserved, least load on the source | Change data capture |
+
 One limitation decides several questions: some sources and specific tables do not support
 incremental ingestion at all, which promotes a full extraction from inelegant to necessary.
 
@@ -81,7 +100,11 @@ storage lifecycle.
 Read the requirement for who should own the files. Data that already sits in a controlled storage
 location, or that other systems read and write directly, points at an external table. Data the
 platform should manage, optimise and eventually delete points at a managed one — which is the
-default and the recommendation.
+default and the recommendation. Unity Catalog managed tables are the default and recommended table
+type for both Delta Lake and Apache Iceberg, and Unity Catalog takes on every read, write, storage
+and optimisation responsibility. So a requirement for transactions, time travel and the deepest
+platform integration, with files the platform manages, is a managed Delta table; the CSV files stay
+a source shape that you load from.
 
 ### Granularity
 
@@ -155,6 +178,25 @@ table size, and the thresholds are the most decidable numbers in this section.
 If you do partition, size it. Each partition should contain at least one gigabyte of data, and
 tables with fewer, larger partitions tend to outperform tables with many smaller ones.
 
+When a very large table does justify date partitioning, partition on a **generated column** rather
+than on the raw timestamp. A timestamp has nearly as many values as rows, so partitioning on it
+creates the tiny partitions the sizing rule warns against. A date generated from it puts a day in one
+partition, and because the date is generated, a query that filters on the timestamp itself gets the
+partition filter derived automatically where possible — nobody has to remember to filter on the date
+column too.
+
+```sql
+CREATE TABLE Catalog1.Schema1.WebEvents (
+  event_id STRING,
+  event_timestamp TIMESTAMP,
+  event_date DATE GENERATED ALWAYS AS (CAST(event_timestamp AS DATE))
+)
+PARTITIONED BY (event_date);
+```
+
+A plain `event_date` column filled by the load gives the same layout and none of that derivation;
+only the generated column connects the two.
+
 Two limits shape a clustering choice as well. You can specify up to **four** clustering keys, and on
 tables below 10 TB more keys can make single-column filtering *worse*. And a clustering key must be a
 column that has statistics collected — Delta collects them for the first 32 columns by default — so a
@@ -206,8 +248,9 @@ timestamp for each write to a table, in reverse chronological order.
 
 > **Trap.** Table history and time travel are controlled by **different retention thresholds**.
 > Table history retention is set by `logRetentionDuration` and defaults to 30 days. The data files
-> that time travel depends on are governed by the `VACUUM` retention threshold, which defaults to
-> seven days. Two figures, two purposes. Merging them is how a candidate answers a retention
+> that time travel depends on are kept for `deletedFileRetentionDuration`, the threshold `VACUUM`
+> uses, which defaults to seven days - so 30 days of time travel means setting that property to 30
+> days. Two figures, two purposes. Merging them is how a candidate answers a retention
 > question with the right idea and the wrong number.
 
 <details>
@@ -283,11 +326,37 @@ to near real-time ingestion of millions of files per hour. Databricks recommends
 Spark Structured Streaming is used to ingest from cloud object storage, with interfaces in Python
 and Scala.
 
-**`COPY INTO`** gives exactly-once, idempotent file processing by default. Because the statement is
+**`COPY INTO`** loads files into a Delta table, with exactly-once, idempotent file processing by
+default. Because the statement is
 idempotent it can be scheduled to run repeatedly and will load only new data — so an option that
 adds manual deduplication around it is solving a problem that does not exist. It also supports
 target table schema inference, mapping, merging and evolution, which is where this objective
 touches the schema-drift one.
+
+A handful of clauses decide most `COPY INTO` questions, so read one statement that uses them all:
+
+```sql
+COPY INTO Catalog1.Schema1.Events
+FROM '/Volumes/Catalog1/Schema1/Volume1/events/'
+FILEFORMAT = JSON
+PATTERN = 'events_2024_*.json'
+FORMAT_OPTIONS ('multiline' = 'true', 'inferSchema' = 'true', 'mergeSchema' = 'true')
+COPY_OPTIONS ('mergeSchema' = 'true');
+```
+
+| Clause | Decides |
+|---|---|
+| `PATTERN` | A glob over the source folder; cannot be combined with `FILES` |
+| `FILES` | A list of named files, up to 1000 |
+| `mergeSchema` in `FORMAT_OPTIONS` | Merges the schemas of the source files being read |
+| `mergeSchema` in `COPY_OPTIONS` | Evolves the target table's schema to the input |
+| `force` in `COPY_OPTIONS` | Turns idempotency off, so loaded files load again |
+
+Files already loaded are skipped even if they have changed since, so skipping needs no option at all
+— `force` is the option that does the opposite. JSON is read one complete object per line by
+default, and records that span several lines need multi-line mode, `multiline` set to true. And
+infer-and-evolve takes `mergeSchema` in both places: the format option without the copy option
+merges what is read but leaves the table's schema where it was.
 
 **Streaming tables** are Delta tables with additional support for streaming or incremental
 processing, targeted by one or more flows in a pipeline. They are built for incremental work and most
@@ -410,17 +479,41 @@ There are **two** of these APIs and the separator is what the source can give yo
 | API | Use it when | Interface |
 |---|---|---|
 | `AUTO CDC` | The source has a change data capture feed | SQL and Python |
-| `AUTO CDC FROM SNAPSHOT` | No feed — only snapshots are available | Python only |
+| `AUTO CDC FROM SNAPSHOT` | No feed — only snapshots are available | SQL and Python |
 
 The second compares in-order snapshots to work out what changed, then processes the result. Read a
-stem that says the source database has no change feed as pointing straight at it, and note that the
-Python-only restriction eliminates a SQL option on top of that.
+stem that says the source database has no change feed as pointing straight at it; the interface is
+not the separator, because both APIs are available in SQL and Python.
 
-Both need two things named: `KEYS`, which identifies the record, and `SEQUENCE BY`, which decides
-which version is newer. Those are not decoration — they are why `AUTO CDC INTO` is idempotent with
+The two take different inputs. `AUTO CDC FROM SNAPSHOT` names `KEYS` and reads a required
+`FROM SNAPSHOT` source, with an optional `WITH VERSION` clause that selects the next snapshot version
+to process; the snapshot version is its ordering. `AUTO CDC` on a change feed names `KEYS`, which
+identifies the record, and `SEQUENCE BY`, which decides which version is newer. Those are not
+decoration — they are why `AUTO CDC INTO` is idempotent with
 respect to them, so applying the same change twice, or out of order, lands on the same final state.
 The sequencing column must be a sortable type and cannot contain nulls, which makes choosing it a
 data-type decision as much as a modelling one.
+
+Three clauses change what a flow does with each event, and none of them is on by default.
+
+```sql
+CREATE OR REFRESH STREAMING TABLE Employees;
+
+CREATE FLOW employees_cdc
+AS AUTO CDC INTO Employees
+FROM stream(employees_feed)
+  KEYS (employee_id)
+  IGNORE NULL UPDATES
+  APPLY AS DELETE WHEN op = "DELETE"
+  SEQUENCE BY sequence_num
+  COLUMNS * EXCEPT (op, sequence_num)
+  STORED AS SCD TYPE 1;
+```
+
+By default `INSERT` and `UPDATE` events are upserted by key, and a row is removed only when `APPLY AS
+DELETE WHEN` says which events are deletes. A partial update that sends null for the columns it did
+not change overwrites them with null unless `IGNORE NULL UPDATES` is set. And `STORED AS` defaults to
+SCD type 1, so history needs `STORED AS SCD TYPE 2` written out.
 
 Two constraints matter. The change data capture interfaces are **not supported** by Apache Spark
 Declarative Pipelines — read that name carefully, because it is close to the Lakeflow pipelines the
@@ -469,6 +562,12 @@ changes.
 **Reshaping** is a matched pair. `PIVOT` transforms rows by rotating the unique values of a
 specified column list into separate columns; `UNPIVOT` rotates columns back into rows. They are
 inverses, and a question can ask for either direction.
+
+`UNPIVOT` also decides what happens to empty cells. By default it **excludes** rows whose value is
+`NULL`, so a month with no figure silently disappears unless you write `UNPIVOT INCLUDE NULLS`. The
+column after `FOR` holds each rotated column's name, or its alias when you give one, which is how
+`jan AS January` becomes a readable label. `INCLUDE NULLS` belongs to `UNPIVOT`; the `PIVOT` syntax has
+no such clause.
 
 Denormalising belongs beside them. Where pivoting changes the shape of a result, denormalising
 changes the shape of the stored model — folding a dimension's attributes into the fact table so a
@@ -523,6 +622,21 @@ decision, because each type represents a defined domain of values — and type r
 set operation follows the least-common-type rule above. And **profiling** computes summary
 statistics over a dataset, which is how distributions are assessed *before* a transformation is
 chosen rather than after it has gone wrong.
+
+On Azure Databricks that is **data profiling**, attached to a Unity Catalog table. It writes its
+results to two metric tables and a dashboard of its own, so the table being profiled and the jobs
+that load it are left alone. The profile type follows the data:
+
+| Profile | Use it for |
+|---|---|
+| Time series | A table with a timestamp column; metrics per time window, so trends show |
+| Snapshot | Any other table; the whole table is reprocessed on each refresh, up to 4 TB |
+
+Its neighbour is **anomaly detection**, which answers a different question. It is enabled on a whole
+schema, by someone with `MANAGE` on the schema or its catalog, and it evaluates every table's
+**freshness** and **completeness** from historical patterns. "Tell me when any table in this schema
+stops arriving" is anomaly detection; "show me null rates and distributions for these columns over
+time" is a time series profile.
 
 Profiling exists to answer three questions the guide names separately, and they are three different
 problems with three different remedies.
@@ -632,7 +746,7 @@ for each input row, and that one clause carries the other three.
 |---|---|
 | Nullability | `NOT NULL` on the column |
 | Range checking | `CHECK (amount BETWEEN 0 AND 1000000)` |
-| Data cardinality | `CHECK` on a value's domain, or a `COUNT` in a pipeline expectation |
+| Data cardinality | `CHECK` on a value's domain, or a validation table in the pipeline |
 | Data type checks | The column's declared type, plus a `CHECK` for values a type cannot exclude |
 
 **Data cardinality** is worth a sentence because the word is used loosely elsewhere. Here it is the
@@ -648,7 +762,9 @@ express is a *sub-range* of itself, which is where `CHECK` comes back in: `INT` 
 numbers, so an age column needs both the type and the constraint.
 
 Two details sit around the edges. Existing rows are verified against a `NOT NULL` constraint before
-it is added, so adding one to a populated table can fail. And a `NOT NULL` on a column nested
+it is added, so adding one to a populated table can fail. You add or drop it after creation with
+`ALTER TABLE ... ALTER COLUMN ... SET NOT NULL` (or `DROP NOT NULL`), so clean the nulls first. And a
+`NOT NULL` on a column nested
 within a struct requires the parent struct to be not null, while columns nested within array or map
 types do not accept `NOT NULL` at all.
 
@@ -662,8 +778,9 @@ A requirement says customer identifiers must be unique. Which constraint, and do
 requirement?
 
 A unique constraint is informational and is **not** enforced, so on its own it does not satisfy a
-requirement to prevent duplicates. Enforcement has to come from somewhere else — a `CHECK`, or the
-pipeline logic that writes the table.
+requirement to prevent duplicates. Enforcement has to come from the logic that writes the table,
+and a validation table can surface duplicates that get through — a `CHECK` cannot, because it sees
+one row at a time.
 </details>
 
 ## Expectations: what the pipeline enforces
@@ -696,6 +813,24 @@ There is a fourth route the table above does not show. Invalid records can be **
 without failing or dropping data — which is the answer when a requirement rejects both losing the
 records and stopping the pipeline.
 
+A rule that needs more than one row, such as key uniqueness, goes in a **validation table**: a
+materialized view that groups by the key and counts, with an expectation on the count.
+
+```sql
+CREATE OR REFRESH MATERIALIZED VIEW orders_pk_check (
+  CONSTRAINT unique_order_id EXPECT (num_entries = 1) ON VIOLATION FAIL UPDATE
+)
+AS SELECT order_id, COUNT(*) AS num_entries
+FROM Catalog1.Schema1.Orders
+GROUP BY order_id;
+```
+
+Use `COUNT(*)` rather than `COUNT(order_id)`, because a column count skips nulls. And know the
+check's limit: expectations enforce data quality, not orchestration. A validation table does not gate
+its downstream tables — a dataset that reads it does not wait for its result, so a failed check does
+not stop them updating. Holding back a downstream load on a failed check is a job orchestration
+decision.
+
 One capability difference is worth carrying. Both SQL and Python support multiple expectations on a
 dataset, but only **Python** allows multiple expectations to be grouped with a collective action. A
 requirement to apply one action across a set of rules is a requirement for the Python interface.
@@ -723,16 +858,31 @@ Schema changes come in two shapes, and the difference is how much data moves.
 based on the schema of the data being inserted or merged into an existing table. This is the
 mechanism behind managing schema drift — the incoming data changes shape and the table follows.
 
-Some changes are neither, and cost more. A column's type or name can be changed, or a column
-dropped, only by **rewriting** the table with the `overwriteSchema` option. A stem naming a type
-change is describing a rewrite, not an alteration.
+Some changes are neither, and cost more. Without the table features below, a column's type or
+name can be changed, or a column dropped, only by **rewriting** the table with the `overwriteSchema`
+option.
+
+Two table features take most of that cost away. **Type widening**, on Databricks Runtime 15.4 LTS
+and above, changes a column to a wider type — `INT` to `BIGINT`, for example — without rewriting data
+files, once `delta.enableTypeWidening` is set to true. A change that is not a widening, such as `INT`
+to `STRING`, is still a rewrite. **Column mapping** makes renames and drops metadata-only, and
+dropping a column requires it; its `name` mode can be set on an existing table. One ordering rule
+comes with a drop: the `CHECK` constraints and generated columns that depend on the column must be
+dropped first.
+
+```sql
+ALTER TABLE Catalog1.Schema1.Shipments DROP CONSTRAINT chk_temp;
+ALTER TABLE Catalog1.Schema1.Shipments DROP COLUMN temporary_field;
+ALTER TABLE Catalog1.Schema1.Shipments ADD COLUMN shipping_carrier STRING;
+ALTER TABLE Catalog1.Schema1.Shipments ALTER COLUMN quantity TYPE BIGINT;
+```
 
 | Change | What it takes |
 |---|---|
 | Add a column | `ALTER TABLE`, or implicit evolution |
 | Let incoming data widen the table | `mergeSchema`, or `WITH SCHEMA EVOLUTION` |
-| Widen a type | Schema evolution, where the component supports it |
-| Rename or drop a column | Supported in the right configuration; a streaming source may need schema tracking and a restart |
+| Widen a type | Type widening, or schema evolution where the component supports it |
+| Rename or drop a column | Column mapping; a streaming source may need schema tracking and a restart |
 | Any other type change | Not supported by evolution — an explicit rewrite |
 
 **And schema evolution is not one switch.** This is the part most likely to be got wrong, because the
@@ -763,8 +913,9 @@ A stem describing a stream that died when a new field appeared and then ran clea
 is describing the documented behaviour, not a fault.
 
 Dropping a column has an afterlife. `REORG TABLE` rewrites the files and `VACUUM` then physically
-deletes those containing the dropped column's data — the same two-step physical removal that makes
-a deletion real in the governance material.
+deletes those containing the dropped column's data, once they are older than the retention threshold
+(seven days by default) — the same two-step physical removal that makes a deletion real in the
+governance material.
 
 The practical reading of this section is that schema *enforcement* and schema *drift* are two sides
 of one setting. Enforcement is the default: a write whose shape does not match the table is
@@ -803,8 +954,15 @@ different stems, and the word to read for is whether the change is *expected*.
 - **The Event Hubs connector cannot be used.** Read the Kafka-compatible endpoint instead.
 - **`warn` is the default expectation action.** No `ON VIOLATION` clause means nothing is blocked.
 - **`REPLACE` keeps grants and masks; a drop does not.** Which is why it is recommended over one.
-- **There are two CDC APIs.** No change feed on the source means `AUTO CDC FROM SNAPSHOT`, Python
-  only.
+- **There are two CDC APIs.** No change feed on the source means `AUTO CDC FROM SNAPSHOT`, in SQL or
+  Python.
+- **`AUTO CDC` writes nulls and keeps no history by default.** `IGNORE NULL UPDATES` and `STORED AS SCD
+  TYPE 2` are opt-ins, and deletes need `APPLY AS DELETE WHEN`.
+- **A validation table reports; it does not gate.** Downstream tables update even when it fails.
+- **`UNPIVOT` drops `NULL` values by default.** Keeping them takes `INCLUDE NULLS`.
+- **Infer-and-evolve in `COPY INTO` takes `mergeSchema` twice.** Once for the files, once for the
+  table.
+- **Partition on a generated date, never on a timestamp.** Base-column filters still prune.
 - **Schema evolution is per component, not per pipeline.** Four layers, configured separately.
 - **`HAVING` filters groups, `WHERE` filters rows.** Putting a row filter in `HAVING` changes the
   aggregate.

@@ -64,6 +64,39 @@ into the governance half of this domain.
 | `APPLY TAG` | Classification, at object and column level |
 | `MODIFY` | Changing contents, including most comments |
 
+What a query actually needs is the question behind most grant items. Reading a table, view or
+materialized view takes three privileges at once: `SELECT` on the object, `USE SCHEMA` on its schema,
+and `USE CATALOG` on its catalog. The two usage privileges grant no data by themselves; they are how
+catalog and schema owners keep control, because a `SELECT` grant reaches nobody who lacks them.
+
+Inheritance then decides how many grants you write. `SELECT` granted on a schema applies to every
+*current and future* table and view in it, so "all reporting objects, including new ones" is two
+grants on the schema. One view, and nothing else, is `SELECT` on that view plus the usage pair:
+
+```sql
+GRANT USE CATALOG ON CATALOG Catalog1 TO Group1;
+GRANT USE SCHEMA ON SCHEMA Catalog1.Schema1 TO Group1;
+GRANT SELECT ON VIEW Catalog1.Schema1.View1 TO Group1;
+```
+
+Creating follows the same shape. `CREATE TABLE` is best granted on a schema for least privilege, and
+granted on a catalog it covers every existing and future schema; either way the user also needs
+`USE CATALOG` and `USE SCHEMA`.
+
+Files have their own pair of paths, and the exam asks which one to open.
+
+| Privilege | Granted on | Lets the user |
+|---|---|---|
+| `READ VOLUME`, `WRITE VOLUME` | A volume, or its schema or catalog | Read or change files in the volume |
+| `READ FILES`, `WRITE FILES` | An external location | Read or write the raw cloud path |
+| `CREATE EXTERNAL VOLUME` | An external location | Register external volumes there |
+| `CREATE EXTERNAL LOCATION` | The metastore and a storage credential | Create new governed paths |
+
+Databricks recommends against direct reads through `READ FILES` and points you to volumes with `READ
+VOLUME` instead. So "register more volumes under the location and work with the files, but no direct
+path access" is `CREATE EXTERNAL VOLUME` on the location and the two volume privileges on the volume.
+`CREATE EXTERNAL LOCATION` is a much broader storage-governance grant.
+
 A service credential is worth separating from a storage credential, because the names are close
 enough to swap under time pressure. A service credential lets a user reach external services and is
 governed by its own privilege; a storage credential is what stands behind access to cloud storage,
@@ -182,9 +215,9 @@ column mask policies, and also **dynamic privilege grants** through `GRANT` poli
 `DENY`, is in Beta and currently reaches one privilege only — worth recognising for one reason, which
 is that a `DENY` beats *every* grant of the same privilege, including one held through ownership.
 
-An `EXCEPT` clause is the exemption route for an administrator or a pipeline, and the documented list
-of what it unblocks is longer than it first looks: time travel, cloning, OpenSharing and full query
-optimisation. Note the third of those, because it is the hinge between this domain's two halves — a
+An `EXCEPT` clause is the exemption route for an administrator or a pipeline. Exempt principals see
+the full data, and the clause also unblocks operations that are otherwise unsupported on protected
+data: cloning, OpenSharing and full query optimisation. Note the third of those, because it is the hinge between this domain's two halves — a
 table under an ABAC policy can be shared at all only if the share owner sits in the `EXCEPT` clause.
 
 Tags come in two families, and the second has a predefined variety inside it. Microsoft names three
@@ -226,6 +259,32 @@ or all three of `APPLY TAG` on it, `USE SCHEMA` on its schema and `USE CATALOG` 
 holds `APPLY TAG` and still cannot apply the classification is not describing a bug.
 
 There is a ceiling: a maximum of 1,000 governed tags per account.
+
+The SQL form is worth reading once, because completion items lean on its clauses:
+
+```sql
+CREATE POLICY mask_ssn
+ON SCHEMA Catalog1.Customers
+COLUMN MASK Catalog1.Sec.MaskSsn
+TO analysts EXCEPT admins
+FOR TABLES
+MATCH COLUMNS has_tag_value('pii', 'ssn') AS ssn
+ON COLUMN ssn;
+```
+
+| Clause | Decides |
+|---|---|
+| `ON CATALOG`, `SCHEMA` or `TABLE` | The scope; every table below it is evaluated |
+| `WHEN` | Which *tables* apply, from table tags; defaults to all |
+| `MATCH COLUMNS ... AS alias` | Which *columns* are targeted, from column tags |
+| `ON COLUMN alias` | The column a mask policy masks |
+| `USING COLUMNS (...)` | The arguments passed to the function |
+
+A row filter policy swaps `COLUMN MASK` for `ROW FILTER`, drops `ON COLUMN`, and usually passes the
+matched column through `USING COLUMNS`; its function returns a boolean, and rows where it returns
+false are excluded. `has_tag('pii')` matches any value of the tag, while `has_tag_value('pii', 'ssn')`
+matches one value. Put a *table* tag such as `sensitivity = high` in `WHEN` and a *column* tag such
+as `geo_region` in `MATCH COLUMNS` — swapping them is the commonest completion error.
 
 Now the comparison the exam actually tests.
 
@@ -460,11 +519,19 @@ naming complete coverage, or naming account-level activity, resolves to the syst
 than to the Azure-side surface — which is the opposite of what an Azure-focused candidate expects.
 
 Two practical figures. Azure Databricks retains a copy of audit logs for up to **one year** for
-security and fraud analysis. And system tables themselves are free to use; you are charged only for
+security and fraud analysis, and the audit log system table, `system.access.audit`, has a free
+retention period of 365 days - workspace-level events stored regionally, account-level events
+globally. Logs you deliver to your own storage keep whatever retention that destination sets, so
+name the surface before quoting a period. And system tables themselves are free to use; you are charged only for
 the compute used to query them, which removes the cost objection a distractor might raise.
 
 Audit log delivery requires the Premium plan. Learn that a plan requirement exists rather than
 memorising what any tier contains.
+
+Sharing has its own audit story. Provider audit logs record the provider's actions and recipients'
+actions on the shared data, and you read them from the audit log system table, `system.access.audit`,
+which an account admin must enable. So a requirement for a queryable record of who accessed a share,
+kept inside Azure Databricks, is the system table, not Azure Monitor and not lineage.
 
 <details>
 <summary><b>Self-check — audit coverage</b></summary>
@@ -557,7 +624,11 @@ OAuth tokens to a recipient in exchange for tokens issued by the recipient's own
 Sharing and fine-grained security interact, and the interaction depends on *which* mechanism you
 chose back in the first half of this domain. A provider **cannot share a table carrying table-level
 row filters or column masks** at all. A table protected by an ABAC policy *can* be shared — but only
-if the share owner is exempt from that policy, named in its `EXCEPT` clause. So a requirement that
+if the share owner is exempt from that policy, named in its `EXCEPT` clause. That exemption makes
+the table shareable; it does not carry the mask across. The provider's policy does not govern the
+recipient's access, so the recipient sees unfiltered, unmasked data by default and applies its own
+ABAC policies to the shared table. It cannot put one on a shared view; recipient-local views over
+shared tables fill that role. So a requirement that
 combines external sharing with row-level protection is not answered by picking a protection
 mechanism and then arranging the share: the choice of mechanism has already decided whether the share
 is possible.
@@ -611,3 +682,9 @@ policy, the share is possible provided the share owner is in the policy's `EXCEP
 - **Lineage needs registration, not Databricks.** External assets join the graph as external
   metadata objects.
 - **System tags are governed tags.** Their definition is fixed; who assigns them is yours to set.
+- **A query needs three grants.** `SELECT` plus `USE SCHEMA` plus `USE CATALOG`; the usage pair alone
+  reads nothing.
+- **Schema-level `SELECT` reaches future objects.** No regranting as tables and views are added.
+- **Volumes, not raw paths.** `READ VOLUME` and `WRITE VOLUME` beat `READ FILES` and `WRITE FILES`.
+- **`WHEN` picks tables, `MATCH COLUMNS` picks columns.** Mask policies name the column with `ON
+  COLUMN`.

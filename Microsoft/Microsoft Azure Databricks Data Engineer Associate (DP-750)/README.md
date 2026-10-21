@@ -9,10 +9,13 @@ Microsoft's published material — the study guide, the certification page, and 
 experience documentation. **Advice about preparing** — what to study first, how to spend the clock,
 what candidates get wrong — is ours, and is labelled where it appears.
 
-This course tracks the study guide marked **Skills measured as of March 11, 2026**.
-*Last verified against the live guide: 17 September 2026 — unchanged.* DP-750 is a new certification
-rather than a revision, so the guide carries no change log yet; when it gains one, that is the first
-thing to re-read.
+This course tracks the study guide marked **Skills measured as of October 19, 2026**.
+*Last verified against the live guide: 20 October 2026.* This is the guide's first revision, and its
+change log marks two objectives as minor changes and nothing else. *Design and implement data
+modeling in Unity Catalog* no longer names deletion vectors in its clustering bullet, though related
+topics can still be tested. *Implement development lifecycle processes in Azure Databricks* now says
+**Declarative Automation Bundles** and **the Databricks CLI**. When the guide changes again, its change
+log is the first thing to re-read.
 
 ---
 
@@ -314,7 +317,7 @@ cut score by statistical analysis and does not publish it as a percentage.
 Everything factual on this page traces to one of these. Check them rather than trusting any summary,
 including this one.
 
-- [Study guide for Exam DP-750](https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/dp-750) — the skills measured, and where a change log will appear
+- [Study guide for Exam DP-750](https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/dp-750) — the skills measured, the change log, and a link to Microsoft's free Practice Assessment
 - [Microsoft Certified: Azure Databricks Data Engineer Associate](https://learn.microsoft.com/en-us/credentials/certifications/implementing-data-engineering-solutions-using-azure-databricks/) — duration, languages, booking
 - [Exam scoring and score reports](https://learn.microsoft.com/en-us/credentials/certifications/exam-scoring-reports) — the scaled score, and why it is not a percentage
 - [Exam duration and exam experience](https://learn.microsoft.com/en-us/credentials/support/exam-duration-exam-experience) — seat time, breaks, question formats
