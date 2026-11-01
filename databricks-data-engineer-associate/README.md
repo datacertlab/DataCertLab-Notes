@@ -46,7 +46,9 @@ though every section counts, because nothing published says it does not.
 
 <!-- dcl:links:details — managed by Github-Tools/sync_course_links.py; edit course_links.json, not this block -->
 
-> 🎯 **Ready to test yourself?** The **[DataCertLab Databricks Data Engineer Associate Practice Tests on Udemy](https://www.udemy.com/course/dcl-databricks-certified-data-engineer-associate-practice-tests/?referralCode=51EF7E17B2DAA59CD76A)** are built from the same exam blueprint as these notes, with a full explanation for every question.
+> 🎯 **Ready to test yourself?** The **[DataCertLab Databricks Data Engineer Associate Practice Tests on Udemy](https://www.udemy.com/course/dcl-databricks-certified-data-engineer-associate-practice-tests/?referralCode=51EF7E17B2DAA59CD76A&couponCode=DATABRICKS-DEA-100)** are built from the same exam blueprint as these notes, with a full explanation for every question.
+>
+> 🎟️ **Free for the first 100 learners:** use code `DATABRICKS-DEA-100` until 1 December 2026. [Apply it on Udemy](https://www.udemy.com/course/dcl-databricks-certified-data-engineer-associate-practice-tests/?referralCode=51EF7E17B2DAA59CD76A&couponCode=DATABRICKS-DEA-100)
 
 <!-- /dcl:links:details -->
 
@@ -381,7 +383,9 @@ certification page for a newer version about two weeks before you sit.*
 
 The **DataCertLab Databricks Data Engineer Associate Practice Tests** are built from the same blueprint as these notes, and every question comes with a full explanation. Read a domain, test yourself on it, then go back to whatever your wrong answers point at.
 
-👉 [Take the practice tests on Udemy](https://www.udemy.com/course/dcl-databricks-certified-data-engineer-associate-practice-tests/?referralCode=51EF7E17B2DAA59CD76A)
+👉 [Take the practice tests on Udemy](https://www.udemy.com/course/dcl-databricks-certified-data-engineer-associate-practice-tests/?referralCode=51EF7E17B2DAA59CD76A&couponCode=DATABRICKS-DEA-100)
+
+> 🎟️ **Free for the first 100 learners:** use code `DATABRICKS-DEA-100` until 1 December 2026. [Apply it on Udemy](https://www.udemy.com/course/dcl-databricks-certified-data-engineer-associate-practice-tests/?referralCode=51EF7E17B2DAA59CD76A&couponCode=DATABRICKS-DEA-100)
 
 > 💡 **Tip:** Open the link in a new tab to keep these notes open for reference.
 

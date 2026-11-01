@@ -800,7 +800,9 @@ stop bad data reaching a table, profiling is not the answer.
 
 Covered the domain? Test yourself with the DataCertLab Databricks Data Engineer Associate Practice Tests, then use the traps below as your last check.
 
-👉 [Practice on Udemy](https://www.udemy.com/course/dcl-databricks-certified-data-engineer-associate-practice-tests/?referralCode=51EF7E17B2DAA59CD76A)
+👉 [Practice on Udemy](https://www.udemy.com/course/dcl-databricks-certified-data-engineer-associate-practice-tests/?referralCode=51EF7E17B2DAA59CD76A&couponCode=DATABRICKS-DEA-100)
+
+> 🎟️ **Free for the first 100 learners:** use code `DATABRICKS-DEA-100` until 1 December 2026. [Apply it on Udemy](https://www.udemy.com/course/dcl-databricks-certified-data-engineer-associate-practice-tests/?referralCode=51EF7E17B2DAA59CD76A&couponCode=DATABRICKS-DEA-100)
 
 > 💡 **Tip:** Open the link in a new tab to keep these notes open for reference.
 
@@ -833,6 +835,6 @@ Learn → Practice → Review → Improve
 
 ---
 
-[🎯 Databricks Data Engineer Associate Practice Tests on Udemy](https://www.udemy.com/course/dcl-databricks-certified-data-engineer-associate-practice-tests/?referralCode=51EF7E17B2DAA59CD76A) · [← Databricks Data Engineer Associate exam overview](README.md) · [All certifications](../README.md)
+[🎯 Databricks Data Engineer Associate Practice Tests on Udemy](https://www.udemy.com/course/dcl-databricks-certified-data-engineer-associate-practice-tests/?referralCode=51EF7E17B2DAA59CD76A&couponCode=DATABRICKS-DEA-100) · [← Databricks Data Engineer Associate exam overview](README.md) · [All certifications](../README.md)
 
 <!-- /dcl:links:footer -->
