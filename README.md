@@ -1,346 +1,63 @@
 # DataCertLab
 
-### Practical, exam-focused certification notes for cloud, data, AI, and developer certifications.
+### Free certification study notes that explain the *why*, not just the answer.
 
-**DataCertLab** is an independent learning initiative focused on creating **high-quality, practical, and continuously maintained study resources** for professional technology certifications.
+**Databricks · Microsoft Fabric · Azure · AWS · Anthropic Claude** — written against each vendor's current exam guide, and updated when the exam changes.
 
-Our goal is simple:
-
-> **Make certification preparation more structured, practical, and useful — without turning it into memorization.**
-
-We publish our core learning notes openly on GitHub so that learners can access them for free, learn at their own pace, and use them as a long-term reference.
+[![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
+[![Free to read](https://img.shields.io/badge/notes-free%20to%20read-brightgreen.svg)](#-pick-your-exam)
 
 ---
 
-## 🎯 What is DataCertLab?
+## 🎓 Pick your exam
 
-Technology certifications are becoming increasingly valuable for demonstrating practical knowledge across cloud, data engineering, analytics, AI, and software development.
+<!-- dcl:links:catalog — managed by Github-Tools/sync_course_links.py; edit course_links.json, not this block -->
 
-However, certification preparation often involves navigating:
+| Vendor | Certification | Exam code | Free study notes | Practice tests |
+|---|---|---|---|---|
+| Anthropic | Claude Certified Developer – Foundations | CCDV-F | [Notes](anthropic-ccdv-f-claude-developer-foundations/) | [Udemy](https://www.udemy.com/course/dcl-claude-certified-developer-foundation-ccdv-f-practicetests/?referralCode=85B66ABCE3A954014F27) |
+| AWS | AWS Certified AI Practitioner | AIF-C01 | [Notes](aws-aif-c01-ai-practitioner/) | [Udemy](https://www.udemy.com/course/dcl-aws-certified-ai-practitioner-aif-c01-practice-tests/?referralCode=9F455BD5CACE13156124) |
+| AWS | AWS Certified Cloud Practitioner | CLF-C02 | [Notes](aws-clf-c02-cloud-practitioner/) | [Udemy](https://www.udemy.com/course/dcl-aws-certified-cloud-practitioner-clf-c02-practice-tests-h/?referralCode=DA02CE650CD9F2496E94) |
+| AWS | AWS Certified Data Engineer – Associate | DEA-C01 | [Notes](aws-dea-c01-data-engineer-associate/) | [Udemy](https://www.udemy.com/course/dcl-aws-certified-data-engineer-associate-dea-c01-practice-tests-l/?referralCode=392B50FE4751AD55C1B6) |
+| Databricks | Databricks Certified Data Engineer Associate | — | [Notes](databricks-data-engineer-associate/) | [Udemy](https://www.udemy.com/course/dcl-databricks-certified-data-engineer-associate-practice-tests/?referralCode=51EF7E17B2DAA59CD76A) |
+| Databricks | Databricks Certified Data Engineer Professional | — | [Notes](databricks-data-engineer-professional/) | [Udemy](https://www.udemy.com/course/dcl-databricks-cert-data-engineer-professional-practice-tests-j/?referralCode=DF8F25ECC65ED8F29F5F) |
+| Microsoft | Microsoft Certified: Azure Fundamentals | AZ-900 | [Notes](microsoft-az-900-azure-fundamentals/) | Coming soon |
+| Microsoft | Microsoft Certified: Azure Databricks Data Engineer Associate | DP-750 | [Notes](microsoft-dp-750-azure-databricks-data-engineer/) | [Udemy](https://www.udemy.com/course/dcl-microsoft-azure-databricks-data-engg-dp-750-practice-tests/?referralCode=F0423FA4F1CF10EFCE2F) |
+| Microsoft | Microsoft Certified: Fabric Analytics Engineer Associate | DP-600 | [Notes](microsoft-dp-600-fabric-analytics-engineer/) | [Udemy](https://www.udemy.com/course/dcl-microsoft-fabric-analytics-engineer-dp-600-practice-tests/?referralCode=3BEE7DC3943313C5FB6E) |
+| Microsoft | Microsoft Certified: Fabric Data Engineer Associate | DP-700 | [Notes](microsoft-dp-700-fabric-data-engineer/) | [Udemy](https://www.udemy.com/course/dcl-microsoft-fabric-data-engineer-dp-700-practice-tests/?referralCode=7C3CC3E8CB02A0C92F23) |
 
-* Large amounts of documentation
-* Multiple official learning resources
-* Changing exam objectives
-* Product documentation and technical concepts
-* Ambiguous or incomplete study material
-* Practice questions that sometimes focus too heavily on memorization
+<!-- /dcl:links:catalog -->
 
-**DataCertLab** was created to solve this problem.
-
-We organize the relevant knowledge into **structured, readable, and practical certification notes**, with an emphasis on understanding the technology rather than simply remembering answers.
-
-Our resources are designed to help you:
-
-* 📚 Understand the concepts behind the certification
-* 🧠 Identify important areas to study
-* 🔍 Connect certification topics with real-world engineering
-* 📝 Test your understanding as you progress
-* 🔄 Keep your preparation aligned with changing exam objectives
+Every folder has an **exam overview** (format, scoring, what changed, how to prepare) and **one note per exam domain**. ⭐ **Star the repo** to get notified when new exams are added.
 
 ---
 
-# 📖 Our Notes
+## ✨ Why these notes
 
-Our GitHub repository is the **free knowledge layer of DataCertLab**.
-
-Each certification is organized into a structured set of notes covering the relevant domains and technologies.
-
-A typical learning path looks like:
-
-```text
-Certification
-│
-├── Exam Overview(README)
-│
-├── Domain 1
-│   ├── Concept
-│   ├── Concept
-│   └── Check Your Knowledge
-│
-├── Domain 2
-│   ├── Concept
-│   ├── Concept
-│   └── Check Your Knowledge
-│
-├── Domain 3
-│   └── ...
-```
-
-The objective is to make the repository useful not only during certification preparation, but also as a **technical reference after the exam**.
+- 📌 **The current exam, not last year's.** Each overview is written against the vendor's latest exam guide and flags where older courses and blog posts will mislead you.
+- 🧭 **Decisions, not definitions.** What a feature is, why it exists, and when to pick it over the look-alike — which is how exam questions are actually written.
+- 🪤 **Traps called out.** Every domain closes with the misconceptions that cost candidates marks.
+- ✅ **Sourced and checked.** Official documentation is the source of truth. AI helps with structure and gap-finding; every technical claim is checked against the docs and reviewed by a human.
 
 ---
 
-# 🔬 How We Create Our Notes
+## 📖 How to use them
 
-We follow a structured research and validation process rather than simply generating notes from a single source.
+**Learn → Practice → Review → Improve**
 
-### 1. Official Ground Truth
-
-We begin with authoritative sources wherever available, including:
-
-* Official exam guides
-* Certification pages
-* Official documentation
-* Product documentation
-* Official FAQs
-* Whitepapers
-* Architecture documentation
-* Official sample questions
-* Product release information and changelogs
-
-These sources form the foundation of the content.
-
-> **Official documentation is the source of truth for technical facts and certification objectives.**
+1. **Read the exam overview** first. It tells you what the exam is made of and where to spend your time.
+2. **Work through the domain notes**, heaviest-weighted domain first.
+3. **Test yourself** with the practice tests linked in each folder, then go back to whatever your wrong answers point at. That loop beats a second read-through.
 
 ---
 
-### 2. Concept Structuring
+## ⚠️ Disclaimer
 
-Relevant information is then organized according to the certification's objectives.
+DataCertLab is an **independent** learning resource, not affiliated with, endorsed by, or sponsored by any certification provider or vendor named here. This repository contains **no** leaked, recalled, or proprietary exam questions; our practice questions are written independently from publicly documented concepts. Certification names and trademarks belong to their owners. Always check the provider's official pages for the latest objectives, policies and requirements.
 
-Instead of copying documentation, we focus on answering questions such as:
+## 🤝 Spotted something?
 
-* What does this technology do?
-* Why does it exist?
-* When should it be used?
-* What problem does it solve?
-* What are its limitations?
-* How does it compare with related services?
-* What are the important implementation considerations?
-
-Where useful, we include examples and practical scenarios.
-
----
-
-### 3. Real-World Calibration
-
-Certification questions frequently test whether you understand **when and why** something should be used.
-
-Therefore, we supplement our research with real-world engineering scenarios and community discussions to identify areas where learners commonly experience confusion.
-
-This helps us identify:
-
-* Common misconceptions
-* Similar-looking services
-* Important terminology
-* Frequently confused concepts
-* Practical architectural trade-offs
-* Areas that deserve additional explanation
-
-Community discussions are treated as **calibration signals**, not as authoritative technical sources.
-
----
-
-### 4. AI-Assisted Review
-
-AI is used as part of our content development workflow to help with tasks such as:
-
-* Structuring information
-* Identifying missing concepts
-* Detecting inconsistencies
-* Generating review questions
-* Comparing related concepts
-* Finding potential ambiguities
-* Performing additional validation passes
-
-However:
-
-> **AI-generated content is not automatically considered correct.**
-
-Technical claims are checked against authoritative sources, and content that requires human judgment is reviewed before publication.
-
----
-
-### 5. Human Validation
-
-The final layer is human review.
-
-We evaluate the material for:
-
-* Technical accuracy
-* Relevance to the certification
-* Clarity
-* Practical usefulness
-* Ambiguous wording
-* Outdated information
-* Misleading simplifications
-* Exam relevance
-
-This is particularly important for certification content because a technically plausible explanation can still be misleading if it lacks the appropriate context.
-
----
-
-# 🧪 Our Content Philosophy
-
-We believe good certification preparation should answer three questions:
-
-### **What?**
-
-What is the technology, service, feature, or concept?
-
-### **Why?**
-
-Why does it exist, and what problem does it solve?
-
-### **When?**
-
-When should you use it — and when should you consider something else?
-
-That distinction is important.
-
-Memorizing:
-
-> "Service A does X"
-
-is useful.
-
-Understanding:
-
-> "Service A does X, is designed for Y, has these constraints, and would be selected over Service B in this scenario"
-
-is much more valuable.
-
----
-
-# 📝 Check Your Knowledge
-
-Major sections may include **Check Your Knowledge** questions.
-
-These are designed to help you identify whether you actually understand the topic before moving forward.
-
-They are intended as **learning and self-assessment questions**, not representations of actual certification exam questions.
-
-For realistic exam-style practice, DataCertLab may provide separate practice-test resources.
-
----
-
-# 🔄 Living Documentation
-
-Technology changes quickly.
-
-Cloud services evolve.
-Products introduce new capabilities.
-Certification objectives change.
-Best practices improve.
-
-For this reason, DataCertLab is designed as **living documentation** rather than a static collection of notes.
-
-We aim to continuously:
-
-* Review certification objectives
-* Track relevant product changes
-* Update outdated explanations
-* Improve examples
-* Add missing concepts
-* Correct inaccuracies
-* Refine learning questions
-
-When significant changes occur, the relevant notes are updated accordingly.
-
-> **The goal is not to publish once. The goal is to maintain.**
-
----
-
-# 🎓 Certifications
-
-DataCertLab focuses primarily on certifications across areas such as:
-
-* ☁️ Cloud Computing
-* 🗄️ Data Engineering
-* 📊 Analytics
-* 🤖 Artificial Intelligence
-* 🧑‍💻 Software Development
-* 🏗️ Cloud Architecture
-* 🔧 Developer & Platform Technologies
-
-The repository will evolve as new technologies and certification paths become relevant.
-
----
-
-# 🆓 Free Knowledge. Premium Practice.
-
-DataCertLab follows a simple model:
-
-### GitHub → Learn
-
-Our core notes are openly available so anyone can learn from them.
-
-### Practice Tests → Validate
-
-For learners who want a more structured exam simulation, we create dedicated practice-test resources.
-
-This allows us to keep the **knowledge itself accessible**, while building additional resources for learners who want deeper exam preparation.
-
----
-
-# ⚠️ Important Disclaimer
-
-DataCertLab is an **independent learning resource**.
-
-We are not affiliated with, endorsed by, or sponsored by the certification providers or technology vendors referenced in this repository unless explicitly stated.
-
-This repository does **not** contain leaked, recalled, or proprietary certification exam questions.
-
-Our practice questions are independently created for educational purposes and are intended to test understanding of publicly documented concepts.
-
-Certification names and trademarks belong to their respective owners.
-
-Always refer to the certification provider's official documentation for the latest:
-
-* Exam objectives
-* Certification requirements
-* Exam policies
-* Product capabilities
-* Official preparation resources
-
----
-
-# 🤝 Contributions & Feedback
-
-We believe technical learning improves through collaboration.
-
-If you find:
-
-* An incorrect statement
-* Outdated information
-* A broken link
-* A confusing explanation
-* A missing concept
-* A useful improvement
-
-please consider opening an **Issue** or submitting a **Pull Request**.
-
-When reporting technical inaccuracies, references to authoritative documentation are especially helpful.
-
----
-
-# 🌱 Our Vision
-
-DataCertLab started with a straightforward idea:
-
-> **Certification preparation should help people become better engineers, not just better at answering multiple-choice questions.**
-
-We want to build a growing, openly accessible knowledge base where certification objectives are connected with the underlying technologies and real-world engineering concepts.
-
-Over time, we hope DataCertLab becomes a useful reference for learners who want to:
-
-**Learn → Understand → Practice → Certify → Apply**
-
----
-
-## ⭐ If You Find This Useful
-
-If these notes help you prepare for a certification or understand a technology, consider:
-
-⭐ **Starring the repository**
-
-🐛 **Reporting an issue**
-
-🔧 **Contributing an improvement**
-
-📢 **Sharing the repository with other learners**
-
-Your feedback helps us keep the material useful and up to date.
+Found an error, an outdated fact or a broken link? Open an **Issue** or a **Pull Request** — a link to the official documentation helps most. If the notes helped you, ⭐ star the repo and share it with someone preparing for the same exam.
 
 ---
 
@@ -356,7 +73,4 @@ provided appropriate attribution is given to DataCertLab and changes are indicat
 Third-party trademarks, documentation, images, and referenced materials remain
 the property of their respective owners and are not covered by this license.
 
-### DataCertLab
-
-**Learn the technology. Understand the concepts. Prepare with confidence.**
-
+**DataCertLab — Learn the technology. Understand the concepts. Prepare with confidence.**
