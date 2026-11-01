@@ -601,9 +601,9 @@ The substitution rename is cosmetic. The documentation's own list says to use th
 older projects still carry the older one, which is not an error to find in a repository.
 
 The engine change matters least day to day and most in one specific way. Bundles were built on the
-Terraform provider; two engines are now supported, and new bundles created with a current command
-line default to the direct one. Databricks recommends migrating and says the older engine will
-soon be disabled — with no date, so treat it as direction, not as a fact about today. The
+Terraform provider; the direct engine does not depend on Terraform, bundles still on the Terraform
+engine are migrated to it automatically on deploy, and in Databricks CLI version 1.20.0 the
+Terraform engine was removed. The
 commands are identical either way. The difference to carry: under the direct engine, a field you
 delete from the configuration reverts to that resource's default, where the older engine left the
 last deployed value in place. If a value matters, state it.

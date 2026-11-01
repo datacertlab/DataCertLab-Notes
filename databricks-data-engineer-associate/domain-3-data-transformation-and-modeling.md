@@ -505,10 +505,11 @@ no guarantee about the schema of the result, so neither belongs in a production 
 **Adaptive query execution is why most inherited Spark tuning advice is wrong here.** It
 re-optimises during execution, on real statistics from the end of a shuffle or broadcast exchange
 rather than pre-run estimates. **Enabled by default**, with four features: sort merge join to
-broadcast hash join, small partitions coalesced after a shuffle, skew handled by splitting and
-replicating skewed tasks, and empty relations detected and propagated. The adaptive query execution page scopes it to non-streaming
-queries with at least one exchange or sub-query — and not every one of those is actually
-re-optimised.
+broadcast hash join, small partitions coalesced after a shuffle, skew in sort merge and shuffle
+hash joins handled by splitting and replicating skewed tasks, and empty relations detected and
+propagated. The skew feature covers joins, not aggregations. The adaptive query execution page scopes it to non-streaming
+queries with at least one exchange or sub-query, and re-optimises every one of them — though the
+result can be the same plan the optimiser compiled before the query ran.
 
 | Property | Default | What it governs |
 |---|---|---|
@@ -645,7 +646,7 @@ Both types refresh on serverless pipelines that do not consume the warehouse's c
 **cost scales with data processed, not warehouse size.** Standalone materialized views always run
 triggered. A refresh is incremental, merging only what changed, or full, rerunning the query;
 Databricks picks between them with a cost model. Incremental needs Delta sources with row tracking
-on, and change data feed is recommended. Refreshes are synchronous unless `ASYNC` starts a
+on. Refreshes are synchronous unless `ASYNC` starts a
 background job and returns immediately.
 
 Materialized views support neither identity columns nor time travel.

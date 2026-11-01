@@ -92,7 +92,7 @@ There are **four combinations** and the exam knows all four.
 | External, Hive metastore | Removed | Remains |
 
 The recovery window on a Unity Catalog managed table is the detail people miss. The data is marked
-for deletion rather than destroyed, and the table can be undropped within the configured period,
+for deletion rather than destroyed, and the table can be restored with `UNDROP TABLE` within the configured period,
 which **defaults to seven days**; setting that period with `RETAIN DROPPED` is Public Preview, so
 answer on the default. Automatic file deletion after `DROP TABLE` is unique to Unity Catalog
 managed tables — no other combination in the table above cleans up after itself.
@@ -144,8 +144,8 @@ The prerequisites differ by source type, and the permission is the half that cat
 Both paths need Delta Lake format and Databricks Runtime 17.3 long-term support (LTS) or above
 or serverless compute. Converting an **external** table then requires **ownership of the table**.
 Converting a **foreign** table requires **owner or `MANAGE`** on it plus `CREATE` on the external
-location, and only Hive metastore and Glue federated tables can be converted at all. Readers and
-writers of the source table need Databricks Runtime 15.4 LTS or above.
+location, and only Hive metastore and Glue federated tables can be converted at all. Databricks
+recommends that readers and writers of the source table use Databricks Runtime 15.4 LTS or above.
 
 Three windows govern what happens afterwards, and they are different numbers for different things:
 
@@ -275,23 +275,25 @@ revoked. 3. By its `applicationId` value, not its display name.
 
 ---
 
-## DENY, and why Unity Catalog does not have it
+## DENY, and why the statement does not work in Unity Catalog
 
-**Objective 7.2 names `DENY`, and Unity Catalog does not support it.** That sentence is the single
-most valuable thing on this page. `DENY` is a real statement in Databricks SQL, it denies a
-privilege to a principal, and a denial takes precedence over any grant — but it **applies only to
-the `hive_metastore` catalog and its objects**. On Unity Catalog it is not supported at all.
+**Objective 7.2 names `DENY`, and the `DENY` statement does not work on Unity Catalog objects.**
+That sentence is the single most valuable thing on this page. `DENY` is a real statement in
+Databricks SQL, it denies a privilege to a principal, and a denial takes precedence over any grant —
+but it **applies only to the `hive_metastore` catalog and its objects**. On Unity Catalog the
+statement is not supported.
 
 So the way you stop a group reading a table in Unity Catalog is to **not grant it, or to revoke
-what was granted**. There is no negative grant to reach for. `REVOKE` is the answer to "make sure they
+what was granted**. There is no negative grant statement to reach for. `REVOKE` is the answer to "make sure they
 cannot read this", and because a revoke succeeds even when nothing was granted, it is safe to run
 without checking first.
 
-Two more places the word appears, and neither rescues the idea. Attribute-based access control
-mentions `DENY` policies only inside a limitation note about two identity functions, which is not a
-basis for teaching a Unity Catalog `DENY`. And what attribute-based access control actually offers
-for exclusion is the `EXCEPT` clause on a policy, which names principals the policy does not apply
-to.
+The word does appear in Unity Catalog in one other place. Attribute-based access control has four
+policy types — row filter, column mask, `GRANT` and `DENY` policies — and the `DENY` policies are in
+**Beta**. That is a tag-driven rule an administrator writes on a catalog or schema, not the `DENY`
+statement, and a Beta feature is not what an exam answer rests on. For carving people out of an
+attribute-based policy, the tool is the `EXCEPT` clause, which names principals the policy does not
+apply to.
 
 Within `hive_metastore`, the semantics explain why the feature reads as attractive. Denying a
 privilege on a schema implicitly denies it on every object in that schema, and you undo a denial

@@ -14,18 +14,18 @@ one.
 | Fact | Value |
 |---|---|
 | Scored questions | 45, all multiple choice |
-| Time limit | 90 minutes |
+| Unscored questions | Up to 10, not identified, so you may see up to 55 in total |
+| Time limit | 90 minutes, with the time for unscored items already included |
 | Registration fee | USD 200, plus local tax |
-| Delivery | Online, or at a test centre |
+| Delivery | Online proctored, or at a test centre |
 | Test aids | None permitted |
 | Prerequisite | None, though six months of hands-on Databricks is recommended |
-| Validity | Two years, then you retake the current live exam |
+| Validity | Two years, then the Data Engineer Associate Renewal Exam or the current full exam |
 | Languages | English, Japanese, Brazilian Portuguese, Korean |
 
-A sitting **may** also carry unscored items — the guide says exams may include them, not that
-they always do. Where they appear, Databricks does not identify them, does not say how many
-there are, and adds time to cover them. So treat 45 as the number of questions that decide your
-result, and be ready for a paper that runs somewhat longer.
+The unscored items look exactly like the scored ones, and the guide says up to 10 may be
+included. So 45 questions decide your result, but you should plan your time for 55. That is
+why our full-length practice tests have 55 questions in 90 minutes.
 
 ### The passing score is not published, and you will be told otherwise
 
@@ -87,12 +87,24 @@ one — it writes "formerly Databricks Repos" and "formerly Databricks Asset Bun
 objectives themselves. So both names are in the current guide, and learning only the old one
 leaves you reading the parenthesis instead of the objective.
 
-| Old name | Current name |
+| Old name | Current name in the guide |
 |---|---|
 | Workflows | Lakeflow Jobs |
-| Delta Live Tables, LDP | Lakeflow Spark Declarative Pipelines |
-| Databricks Asset Bundles | Declarative Automation Bundles, or Automation Bundle |
-| Databricks Repos | Databricks Git Folders |
+| Delta Live Tables (DLT), LDP | Lakeflow Declarative Pipelines |
+| Databricks Asset Bundles (DABs) | Declarative Automation Bundles |
+| Databricks Repos | Databricks Git folders |
+
+**The guide was refreshed on 6 August 2026, and the exam was not.** The update table on its
+first page says the exam was published on 4 May 2026 and the guide updated on 6 August. The
+sections, objectives and weights are the same. What moved:
+
+- Names tightened: "Databricks Platform" instead of "Databricks Data Intelligence Platform",
+  "Lakeflow Declarative Pipelines" instead of "Lakeflow Spark Declarative Pipelines", and
+  "Declarative Automation Bundle" instead of "Automation Bundle".
+- The guide now says up to 10 unscored items may appear, and that you can recertify with a
+  renewal exam.
+- The sample questions went from five to ten, with an official answer key and explanations.
+  Two of the original five changed their answer, which the next section covers.
 
 **Two sections are entirely new.** Implementing CI/CD at 10% and Troubleshooting, Monitoring,
 and Optimization at 10% had no counterpart section in the previous guide. Together they are a
@@ -124,7 +136,7 @@ So the rule to carry in is about the **objective**, not the topic:
 - A topic without its own objective can still be the right answer, where a current objective
   covers the ground. Audit-log storage under an ingestion objective is the guide's own worked
   example.
-- Delta Sharing and Lakehouse Federation are not named as objectives anywhere in the May 2026
+- Delta Sharing and Lakehouse Federation are not named as objectives anywhere in the current
   outline. That is all the outline establishes. It does not put them beyond every question:
   objective 1.1 asks about the platform's core components "such as its architecture, Delta
   Lake, and Unity Catalog", and a *such as* list is open at the end.
@@ -133,19 +145,18 @@ Ask which objective a question is testing, not whether its topic still has a bul
 publishes nothing about how it builds wrong answers, so treat none of this as a rule about
 where distractors come from.
 
-### One name has already moved on without the guide
+### One product has three names in play
 
-The guide names **Lakeflow Spark Declarative Pipelines**. Current Databricks documentation
-calls the same product **Lakeflow pipelines** — the page on what happened to Delta Live Tables
-says the product "has been updated to Lakeflow pipelines", and the release notes now use that
-shorter name too. The longer form points at Apache Spark Declarative Pipelines, the
-open-source framework the Databricks product extends.
+The guide names **Lakeflow Declarative Pipelines** (the May version said Lakeflow Spark
+Declarative Pipelines). Current Databricks documentation calls the same product **Lakeflow
+pipelines** — the page on what happened to Delta Live Tables says the product "has been
+updated to Lakeflow pipelines". The guide's own training list names the open-source framework
+the product extends, Apache Spark Declarative Pipelines.
 
-**This does not change the exam answer.** The exam guide is what the exam is written from, and
-it uses the longer name. If an option says Lakeflow Spark Declarative Pipelines and another
-says Delta Live Tables, the first is current and the second is the retired name. Do not talk
-yourself out of a correct option because the documentation you just read said something
-shorter. Learn all three names for the one product, and pick the one the guide uses.
+**This does not change the exam answer.** The exam guide is what the exam is written from. If
+an option says Lakeflow Declarative Pipelines and another says Delta Live Tables, the first is
+current and the second is the retired name. Do not talk yourself out of a correct option
+because the documentation you just read used a shorter name. Learn the names as one product.
 
 ---
 
@@ -156,11 +167,19 @@ exam for this certification, whatever older links suggest. What follows comes fr
 through every sample Databricks publishes for this exam, read alongside the samples in its
 other current exam guides.
 
-**Read one caveat first.** The guide labels its own samples: *"These questions are retired
-from a previous version of the exam."* They are printed under the current objectives to show
-what each objective means. So they are reliable evidence of **how Databricks writes**, and
-weaker evidence of how hard the live form is. Everything below is about style, and style is
-the part that carries across.
+**There are ten of them now, with answers explained.** The August 2026 guide prints ten
+samples, each under the objective it illustrates, followed by an answer key that explains why
+each wrong option is wrong. They are the best evidence there is of **how Databricks writes**
+for this exam. Read the explanations as well as the keys: they show the reasoning the exam
+expects.
+
+**Two answers changed, and older material still teaches the old ones.**
+
+- The Spark UI skew sample is now a `groupBy` aggregation with adaptive query execution
+  already on, and the answer is to salt the aggregation key. The explanation says why: AQE's
+  skew handling splits skewed *joins*, not aggregations.
+- The sample about analysts running ad hoc SQL all day now answers with a serverless SQL
+  warehouse, where the May version said a high-concurrency cluster.
 
 **The published samples are scenarios.** Each opens with a situation rather than a question,
 and the pattern holds across Databricks' other current exams too. Treat that as a consistent
@@ -172,9 +191,9 @@ with a single answer. The format is not guaranteed — another current Databrick
 includes a five-option item asking for two answers — but if a stem wants two, it says so. No
 sample anywhere uses "All of the above" or "None of the above".
 
-**Stems are short.** The published samples run from about 23 to 64 words, clustering near 48.
-That is a measurement of retired samples rather than a promise about the live form, but where
-a stem does run long, the extra words are evidence rather than padding.
+**Most stems are short, and some are not.** The ten samples run from about 24 to 110 words,
+clustering near 50. The long one is the Spark UI question, and every extra word in it is
+evidence you need. Where a stem runs long, the extra words are evidence rather than padding.
 
 **The decisive constraint is in lower case.** No published sample capitalises MOST, LEAST or
 BEST, and Databricks publishes no rule about it either way — so treat it as an observed habit
@@ -183,11 +202,11 @@ the lowest cost", "without rearranging the data", "while emphasizing simplicity"
 stated assumption. Read the last line twice. If you are used to exams that shout the qualifier,
 do not wait for the shout.
 
-**Expect code, even though the DEA samples contain none.** The guide says outright that code
-is given in SQL where possible and in Python otherwise, so it is on the exam. It simply does
-not appear in the samples chosen for this guide. In Databricks' other current guides it sits
-inline inside the scenario — a `CREATE TABLE` statement or a few lines of PySpark — rather
-than in a separate block. Prepare to read code in a stem.
+**Expect code.** The certification page says code is given in SQL where possible and in
+Python otherwise. The newer samples show it in the options: a `BUNDLE_VAR_` environment
+variable, a masking function built on `is_account_group_member`, `ALTER TABLE ... UNSET
+MANAGED`. In Databricks' other current guides it also sits inside the scenario — a `CREATE
+TABLE` statement or a few lines of PySpark. Prepare to read code in a stem and in the options.
 
 **Numbers in a stem are load-bearing.** Where a sample gives a shuffle read size or a task
 duration, the answer turns on it. The samples do not decorate a stem with a figure that does
@@ -197,17 +216,18 @@ not matter.
 
 ## Timing and pacing
 
-You get 90 minutes for 45 scored questions. That is about two minutes each, and the unscored
-items come with extra time rather than eating into it.
+You get 90 minutes for up to 55 questions: 45 scored and up to 10 unscored that you cannot
+tell apart. Plan on a little over a minute and a half each, and treat every question as one
+that counts.
 
-Two minutes is comfortable for this exam, given a median stem of 48 words. The risk is not
-running out of time. It is spending four minutes on a governance question you half-know and
-then rushing three ingestion questions you would have got right.
+That pace is comfortable, given a median stem of about 50 words. The risk is not running out
+of time. It is spending four minutes on a governance question you half-know and then rushing
+three ingestion questions you would have got right.
 
 A workable pass structure:
 
 1. **First pass, about 60 minutes.** Answer everything you know. Flag anything that needs
-   more than roughly two minutes and move on immediately.
+   more than roughly a minute and a half and move on immediately.
 2. **Second pass, about 25 minutes.** Return to the flagged questions with the pressure off.
 3. **Last five minutes.** Confirm nothing is unanswered.
 
@@ -302,7 +322,7 @@ column says where that stops.
 
 | Resource | Why it is worth your time | Cost |
 |---|---|---|
-| [Exam guide PDF](https://www.databricks.com/sites/default/files/2026-05/databricks-certified-data-engineer-associate-exam-guide-may-2026-000.pdf) | The syllabus, and the only authority on what is asked | Free |
+| [Exam guide PDF](https://www.databricks.com/sites/default/files/2026-10/Databricks-Certified-Data-Engineer-Associate-Exam-Guide-August-2026.pdf) | The syllabus, ten sample questions with explained answers, and the only authority on what is asked | Free |
 | [Certification page](https://www.databricks.com/learn/certification/data-engineer-associate) | Registration, languages, and the link to the current guide | Free |
 | [AI Prep Guide](https://www.databricks.com/sites/default/files/2026-06/ai-prep-guide-any-databricks-certification.pdf) | Databricks' own method for studying with an AI tool, including how to catch the outdated answers they give | Free |
 | [Databricks Academy](https://www.databricks.com/learn/training/certification) | The courses the guide's Recommended Training names | Self-paced free; instructor-led is paid, and access can depend on entitlement |
@@ -326,28 +346,28 @@ that tells you "probably ready" has told you nothing you can act on.
 
 So there is one number here, and only one.
 
-**The threshold:** 32 correct out of 45 on a full-length mock — 45 questions, 90 minutes, no
+**The threshold:** 39 correct out of 55 on a full-length mock — 55 questions, 90 minutes, no
 notes. That is this course's own readiness bar, the same figure shown on our practice tests. It
 is not a Databricks pass mark, and it is not the 70% myth corrected earlier on this page; it is
-a threshold we chose, and 32 of 45 is what it works out to. Below it, keep studying. Above it,
+a threshold we chose, and 39 of 55 is what it works out to. Below it, keep studying. Above it,
 you are in reasonable shape — and still not finished, because the real signal is objective
 coverage.
 
-**Then read the mock by section, because the total hides where the marks went.** A 45-question
+**Then read the mock by section, because the total hides where the marks went.** A 55-question
 mock splits by the published weights, so each section contributes a fixed number of questions:
 
-| Section | Questions in a 45-question mock |
+| Section | Questions in a 55-question mock |
 |---|---|
 | Databricks Intelligence Platform | 3 |
-| Data Ingestion and Loading | 9 |
-| Data Transformation and Modeling | 10 |
-| Working with Lakeflow Jobs | 7 |
-| Implementing CI/CD | 5 |
-| Troubleshooting, Monitoring, and Optimization | 4 |
-| Governance and Security | 7 |
+| Data Ingestion and Loading | 12 |
+| Data Transformation and Modeling | 12 |
+| Working with Lakeflow Jobs | 9 |
+| Implementing CI/CD | 6 |
+| Troubleshooting, Monitoring, and Optimization | 5 |
+| Governance and Security | 8 |
 
 Two things fall out of that table. Dropping half of Data Transformation and Modeling costs you
-five marks, while getting every Platform question wrong costs three — so a weak section is only
+six marks, while getting every Platform question wrong costs three — so a weak section is only
 worth worrying about in proportion to its size. And because Databricks does not say whether a
 per-section minimum applies, do not let any section sit near zero on the assumption you can
 carry it elsewhere.
@@ -371,9 +391,9 @@ minute exam and reading accuracy is what it measures.
 
 ---
 
-*This page tracks the official exam guide version May 4, 2026 (file: may-2026-000), retrieved
-22 August 2026. Databricks updates the guide whenever the exam changes. Check the
-certification page for a newer version about two weeks before you sit.*
+*This page tracks the official exam guide version August 6, 2026, for the exam published 4
+May 2026. Databricks updates the guide whenever the exam changes. Check the certification
+page for a newer version about two weeks before you sit.*
 
 <!-- dcl:links:end — managed by Github-Tools/sync_course_links.py; edit course_links.json, not this block -->
 

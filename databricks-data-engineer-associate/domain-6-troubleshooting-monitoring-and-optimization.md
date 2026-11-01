@@ -141,7 +141,9 @@ a question about the work itself.
 Two qualifications. For a multi-task job the job-level breakdown counts Waiting for resources
 only until the first task starts, so the full picture lives in each task's own breakdown. And a
 pipeline task has different phases entirely — created, waiting for resources, initializing,
-setting up tables, and running.
+setting up tables, and running. Where several jobs run back to back and each waits for its own
+cluster, make them tasks of one multi-task job: tasks in a job share the same cluster for the run,
+so the start-up is paid once.
 
 > **Trap.** A run that got slower is not necessarily code. The documented causes are more data,
 > a changed job or compute configuration, and changed code, in that order. Check what changed
@@ -268,7 +270,10 @@ short list of causes: there is genuinely no work to do, the driver is compiling 
 non-Spark code is running, the driver is overloaded, or the cluster is malfunctioning. On
 all-purpose compute the first is the most likely, because the cluster stays up between queries.
 Building a plan with `withColumn()` inside a loop is a documented way to produce an expensive
-plan and a long gap while it compiles.
+plan and a long gap while it compiles. An overloaded driver, shown in red in the cluster's Server
+load distribution, usually means too many streams, queries or Spark jobs on one cluster. The
+options are a bigger driver, less concurrency, or spreading the load over several clusters, and
+Databricks suggests first trying to double the size of the driver.
 
 Executors leaving the timeline is likewise not automatically a failure. The most common reasons
 are autoscaling, which is expected, spot instance loss, and executors running out of memory — and
@@ -301,8 +306,11 @@ statistics at all, **the stage has no spill** — an absent number is an answer 
 **I/O bound is a calculation, not an impression.** Take the largest number in any input or output
 column, divide by the number of worker cores, then by the stage duration, and compare the result
 against what the hardware can do. A stage moving a lot of data is not automatically I/O bound; a
-stage moving a little can be. Where a stage really is bound by input, the remedies are Delta Lake,
-liquid clustering on the filter columns, and reading less. Where it is bound by output, check
+stage moving a little can be. Where a stage really is bound by input, the documented approaches
+are liquid clustering for better data skipping, a more selective query, Photon, the disk cache
+when the stage reads the same data repeatedly, and more compute, a larger cluster or serverless.
+The first three read less or read faster; more compute pays for the same reads. Where it is
+bound by output, check
 whether Spark is rewriting more data than you expect by comparing the write in the SQL directed
 acyclic graph (DAG) against what you asked it to write.
 
@@ -362,9 +370,15 @@ configuration to `auto` and letting Spark choose, rather than tuning the number 
 
 **Adaptive query execution (AQE) is enabled by default.** It re-optimises a query while it runs.
 It has four features: switching a sort merge join to a broadcast hash join, coalescing small
-partitions after a shuffle, handling skew by splitting oversized tasks, and detecting empty
-relations. Because it is already on, **enabling adaptive query
-execution is a no-op** as an answer, and it is a distractor precisely because it sounds active.
+partitions after a shuffle, dynamically handling skew in sort merge join and shuffle hash join by
+splitting oversized tasks, and detecting empty relations. Because it is already on, **enabling
+adaptive query execution is a no-op** as an answer, and it is a distractor precisely because it
+sounds active.
+
+**AQE's skew handling is for joins.** A skewed `groupBy` aggregation is not split by it, so a
+hot key in an aggregation stays one long task with AQE on. The exam guide's own Spark UI sample
+is exactly this case, and its answer is to salt the aggregation key so the hot value spreads
+across tasks, then combine the partial results.
 
 AQE's skew handling and the Spark UI's skew rule are not the same measurement. AQE compares
 partitions against the **median**; the stage page compares maximum duration against the **75th
@@ -509,7 +523,7 @@ Learn → Practice → Review → Improve
 | A taller bar in the matrix is a worse run | Height is duration; colour is outcome |
 | Run history can show a quarter-on-quarter trend | 60 days only; that is a system-tables question |
 | A queued run needs a bigger cluster | Queued is a concurrency limit |
-| Enabling AQE will fix a skewed stage | It is already enabled by default |
+| Enabling AQE will fix a skewed stage | It is already enabled by default, and it splits skewed joins only |
 | Spill means the disk filled up | Spill is execution memory pressure |
 | Gaps in the timeline mean something broke | Short gaps are expected; a minute or more is the signal |
 | Any stage moving lots of data is I/O bound | It is a rate per core per second, not a volume |

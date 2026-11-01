@@ -266,8 +266,9 @@ one of three routes: typed in as a JSON array, taken from a preceding task's tas
 from a job parameter. An upstream SQL task can also feed it directly, each output row sent to the
 nested task in turn, within that task's limit of 1,000 rows and 48 KB. The Concurrency setting
 decides how many iterations run at once and **defaults to 1**, so a loop is serial until somebody
-changes that. Downstream tasks depend on the For each task itself; they cannot depend on or
-reference the nested task inside it.
+changes that. Downstream tasks depend on the For each task itself; they cannot set the nested task
+inside it as a dependency, though they can read the task values it set on each iteration, as one
+list in iteration order.
 
 A **task value** is how one task hands a computed result to a later one, and it is what makes
 both of the above useful. You set one in a Python notebook:
@@ -344,7 +345,9 @@ exponential backoff. Neither of those makes an ordinary scheduled job retry.
 Two details decide scenario questions. With both a timeout and retries configured, the timeout
 applies to **each retry** — ten minutes with three retries is up to forty minutes of wall clock,
 and everything downstream waits for all of it. And the retry interval is measured from the start
-of the failed run, not from the moment it failed.
+of the failed run, not from the moment it failed. If you only want to hear about a slow run, set a
+**warning duration threshold** instead: it is the expected completion time and raises an event when
+passed, while a timeout is the maximum and marks the run Timed Out.
 
 Continuous jobs work differently enough to state separately. You cannot give one a retry policy;
 it retries the whole job on failure with exponential backoff and there is no limit on the number
@@ -420,8 +423,8 @@ Task-level notifications are the documented answer to both.
 
 ## What starts the job
 
-**The product offers six trigger types. The objective names three of them, and that is where the
-marks are.**
+**The product offers seven ways to start a job. The objective names three of them, and that is where
+the marks are.**
 
 | Trigger type | It starts a run | Reach for it when |
 |---|---|---|
@@ -430,6 +433,7 @@ marks are.**
 | **Table update** | Monitored source tables are updated | The upstream job is the signal |
 | Continuous | Whenever the previous run ends | The workload is always-on streaming |
 | Model update | A registered model is created or changed | It is a machine learning workflow |
+| Upstream job completion | An upstream job finishes | Another job's run is the signal |
 | None | Only when a person or a tool asks | Runs are started by hand |
 
 > **Currency.** The list in the product is longer than the three the objective names, and two
@@ -458,7 +462,8 @@ have at most 50 such jobs and the location at most 10,000 files. The trigger sta
 does not tell the job which files are new, and Auto Loader is what the documentation reaches for
 to process them incrementally and exactly once.
 
-**The table update trigger** watches up to 10 Unity Catalog tables for data changes — updates,
+**The table update trigger** watches up to 25 Unity Catalog tables (more than 10 only when file
+events are enabled on each one) for data changes — updates,
 merges and deletes — across managed tables, external tables backed by Delta Lake, materialized
 views, streaming tables, and views over supported tables. Where more than one is selected, you
 choose whether the run fires when any table is updated or only when all tables are updated. The
@@ -575,7 +580,7 @@ that watching must cost more than polling is simply wrong here.
 
 | Question | File arrival trigger | Table update trigger |
 |---|---|---|
-| What it watches | New files in a governed location | Commits to up to 10 tables |
+| What it watches | New files in a governed location | Commits to up to 25 tables |
 | Where it sits | The front door of the pipeline | Between one job and the next |
 | Jobs per workspace without file events | 50 | 1,000 |
 

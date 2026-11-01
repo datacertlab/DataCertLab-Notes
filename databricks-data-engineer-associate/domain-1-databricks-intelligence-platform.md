@@ -2,7 +2,9 @@
 
 This domain is 6% of the exam, the smallest of the seven. Do not skip it. It defines the
 vocabulary the other six assume, and two of its ideas — where compute runs, and what a table
-already is — decide questions filed under other sections entirely.
+already is — decide questions filed under other sections entirely. The August 2026 guide calls
+the product the Databricks Platform in its objectives, where older material says Databricks Data
+Intelligence Platform; they are the same thing.
 
 The sections below are not in the guide's order. They follow the three questions you actually
 ask when you meet this platform: where does my code run, what is my data sitting in and how is

@@ -74,14 +74,14 @@ single thing in this domain.
 | Databases and business applications | Lakeflow Connect | Configuration-driven, handles authentication and CDC |
 | Message buses | A Structured Streaming source | These are native streaming sources, not files |
 | Small or static reference data | A batch read into a materialized view | No benefit to streaming something that **barely changes** |
-| A REST API with no connector | Land its responses as files first | Then the file case above applies |
+| A REST API with no connector | One of three API patterns | A materialized view for small pulls, the Python Data Source API for high volume, or land responses as files for Auto Loader |
 
 ```mermaid
 flowchart TD
     A{"Files in<br/>storage?"} -->|"Yes"| B["Auto<br/>Loader"]
     A -->|"No"| C{"Managed<br/>connector?"}
     C -->|"Yes"| D["Lakeflow<br/>Connect"]
-    C -->|"No"| E["Land as<br/>files first"]
+    C -->|"No"| E["An API<br/>pattern"]
 ```
 
 Two things sit outside that table and are worth placing now. Lakeflow Connect standard
@@ -310,6 +310,12 @@ somewhere with no object lifecycle policy: if those files are cleaned, the strea
 corrupted and you start over. And in a declarative pipeline you set neither the checkpoint nor
 the schema location, because the pipeline manages both.
 
+Why not point a plain file stream, `spark.readStream.format("json")`, at the directory instead?
+Because the documented advantages of Auto Loader over reading files directly with Structured
+Streaming are the problems that stream hits at scale: its discovery cost scales with the number
+of files ingested rather than the number of directories, it supports schema inference and
+evolution, and native cloud listing APIs and file notification mode keep the cost down.
+
 In Python the same ingestion is a stream read and a stream write:
 
 ```python
@@ -455,8 +461,10 @@ limit is hard, the byte limit is soft.
 
 Finally, the answer to "how do I run a streaming tool once a night". The available-now trigger
 processes everything that arrived before the query started and then stops, so Auto Loader can be
-scheduled in Lakeflow Jobs as an ordinary batch job. That is what the objective means by batch
-modes, and it is the documented way to cut compute cost when latency does not matter.
+scheduled in Lakeflow Jobs as an ordinary batch job. Files that land while a run is under way
+are not lost; they are ignored until the next trigger, so the next run picks them up. That is
+what the objective means by batch modes, and it is the documented way to cut compute cost when
+latency does not matter.
 
 <details>
 <summary><b>Self-check — finding files</b></summary>
@@ -512,7 +520,8 @@ reading its change log would.
 Incremental behaviour is shared. The first run ingests everything selected and tracks changes in
 parallel; later runs bring in only what changed, where the source supports it. On failure the
 connector retries with backoff, and where a person has to intervene it stores the cursor
-position so it can resume.
+position so it can resume. Pipelines can run as a **service principal**, and Databricks says to
+set that up first, so ingestion never depends on one person's account staying active.
 
 Reaching the source is the other half of configuring one. Connectors for business
 applications call the source's own APIs over the network, and work with serverless egress
