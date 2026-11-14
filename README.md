@@ -6,6 +6,9 @@
 
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
 [![Free to read](https://img.shields.io/badge/notes-free%20to%20read-brightgreen.svg)](#-pick-your-exam)
+[![Website: datacertlab.com](https://img.shields.io/badge/website-datacertlab.com-1c57b5.svg)](https://datacertlab.com)
+
+📖 **Prefer reading in a browser?** The Databricks and Microsoft Fabric notes are also at **[datacertlab.com](https://datacertlab.com)**, with search, dark mode and one page per domain.
 
 ---
 
